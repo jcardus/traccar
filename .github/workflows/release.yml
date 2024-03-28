@@ -39,8 +39,14 @@ jobs:
           ./SenchaCmd-*.sh -q
           echo "$HOME/bin/Sencha/Cmd/" >> $GITHUB_PATH
       - run: ./traccar-web/tools/package.sh
-      - run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install libgcc-s1:i386 libstdc++6:i386
-          sudo apt-get install innoextract makeself wine32 s3cmd      
+      - run: zip -r deploy.zip . -x '*.git*' -x 'src/*' -x '.gradle/*' -x 'gradle/*'
+      - uses: einaregilsson/beanstalk-deploy@v21
+        name: deploy eb
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: traccar-tf
+          environment_name: Traccar-env
+          version_label: ${{ github.run_number }}
+          region: eu-west-3
+          deployment_package: deploy.zip 
