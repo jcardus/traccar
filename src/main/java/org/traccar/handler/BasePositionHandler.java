@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Anton Tananaev (anton@traccar.org)
+ * Copyright 2015 - 2024 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,30 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.traccar;
+package org.traccar.handler;
 
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
+import org.traccar.model.Position;
 
-public final class GlobalTimer {
+public abstract class BasePositionHandler {
 
-    private static Timer instance = null;
-
-    private GlobalTimer() {
+    public interface Callback {
+        void processed(Position position);
     }
 
-    public static void release() {
-        if (instance != null) {
-            instance.stop();
-        }
-        instance = null;
-    }
-
-    public static Timer getTimer() {
-        if (instance == null) {
-            instance = new HashedWheelTimer();
-        }
-        return instance;
-    }
-
+    public abstract void handlePosition(Position position, Callback callback);
 }
