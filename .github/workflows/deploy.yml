@@ -1,0 +1,46 @@
+name: Build Installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version'
+        required: true
+        default: 'preview'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+      - run: git checkout ${{ github.ref_name }}
+        working-directory: ./traccar-web
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: ./gradlew build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: npm
+          cache-dependency-path: traccar-web/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: ./traccar-web
+      - run: zip -r deploy.zip . -x '*.git*' -x 'src/*' -x '.gradle/*' -x 'gradle/*'
+      - uses: einaregilsson/beanstalk-deploy@v21
+        name: deploy eb
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: traccar-tf
+          environment_name: Traccar-env
+          version_label: ${{ github.run_number }}
+          region: eu-west-3
+          deployment_package: deploy.zip
