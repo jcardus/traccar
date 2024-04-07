@@ -24,13 +24,6 @@ jobs:
           java-version: 21
           cache: gradle
       - run: ./gradlew build
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 21
-          cache: npm
-          cache-dependency-path: traccar-web/package-lock.json
-      - run: npm ci && npm run build
-        working-directory: ./traccar-web
       - run: zip -r deploy.zip . -x '*.git*' -x 'src/*' -x '.gradle/*' -x 'gradle/*'
       - uses: einaregilsson/beanstalk-deploy@v21
         name: deploy eb
