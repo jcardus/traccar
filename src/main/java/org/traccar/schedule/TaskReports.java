@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 Anton Tananaev (anton@traccar.org)
+ * Copyright 2023 - 2024 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.google.inject.servlet.ServletScopes;
 import net.fortuna.ical4j.model.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.traccar.helper.LogAction;
 import org.traccar.model.BaseModel;
 import org.traccar.model.Calendar;
 import org.traccar.model.Device;
@@ -42,7 +43,9 @@ import org.traccar.storage.query.Request;
 import jakarta.inject.Inject;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -80,8 +83,9 @@ public class TaskReports implements ScheduleTask {
                 var lastEvents = calendar.findPeriods(lastCheck);
                 var currentEvents = calendar.findPeriods(currentCheck);
 
-                if (!lastEvents.isEmpty() && currentEvents.isEmpty()) {
-                    Period period = lastEvents.iterator().next();
+                Set<Period> finishedEvents = new HashSet<>(lastEvents);
+                finishedEvents.removeAll(currentEvents);
+                for (Period period : finishedEvents) {
                     RequestScoper scope = ServletScopes.scopeRequest(Collections.emptyMap());
                     try (RequestScoper.CloseableScope ignored = scope.open()) {
                         executeReport(report, period.getStart(), period.getEnd());
@@ -110,6 +114,7 @@ public class TaskReports implements ScheduleTask {
         ReportMailer reportMailer = injector.getInstance(ReportMailer.class);
 
         for (User user : users) {
+            LogAction.report(user.getId(), true, report.getType(), from, to, deviceIds, groupIds);
             switch (report.getType()) {
                 case "events":
                     var eventsReportProvider = injector.getInstance(EventsReportProvider.class);

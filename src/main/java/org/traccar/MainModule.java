@@ -66,7 +66,7 @@ import org.traccar.geocoder.MapmyIndiaGeocoder;
 import org.traccar.geocoder.NominatimGeocoder;
 import org.traccar.geocoder.OpenCageGeocoder;
 import org.traccar.geocoder.PositionStackGeocoder;
-import org.traccar.geocoder.TestGeocoder;
+import org.traccar.geocoder.PlusCodesGeocoder;
 import org.traccar.geocoder.TomTomGeocoder;
 import org.traccar.geolocation.GeolocationProvider;
 import org.traccar.geolocation.GoogleGeolocationProvider;
@@ -79,7 +79,6 @@ import org.traccar.handler.GeolocationHandler;
 import org.traccar.handler.SpeedLimitHandler;
 import org.traccar.handler.TimeHandler;
 import org.traccar.helper.ObjectMapperContextResolver;
-import org.traccar.helper.SanitizerModule;
 import org.traccar.helper.WebHelper;
 import org.traccar.mail.LogMailManager;
 import org.traccar.mail.MailManager;
@@ -132,11 +131,8 @@ public class MainModule extends AbstractModule {
 
     @Singleton
     @Provides
-    public static ObjectMapper provideObjectMapper(Config config) {
+    public static ObjectMapper provideObjectMapper() {
         ObjectMapper objectMapper = new ObjectMapper();
-        if (config.getBoolean(Keys.WEB_SANITIZE)) {
-            objectMapper.registerModule(new SanitizerModule());
-        }
         objectMapper.registerModule(new JSONPModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         return objectMapper;
@@ -191,7 +187,7 @@ public class MainModule extends AbstractModule {
 
     @Provides
     public static WebServer provideWebServer(Injector injector, Config config) {
-        if (config.hasKey(Keys.WEB_PORT)) {
+        if (config.getInteger(Keys.WEB_PORT) > 0) {
             return new WebServer(injector, config);
         }
         return null;
@@ -201,7 +197,7 @@ public class MainModule extends AbstractModule {
     @Provides
     public static Geocoder provideGeocoder(Config config, Client client, StatisticsManager statisticsManager) {
         if (config.getBoolean(Keys.GEOCODER_ENABLE)) {
-            String type = config.getString(Keys.GEOCODER_TYPE, "google");
+            String type = config.getString(Keys.GEOCODER_TYPE);
             String url = config.getString(Keys.GEOCODER_URL);
             String key = config.getString(Keys.GEOCODER_KEY);
             String language = config.getString(Keys.GEOCODER_LANGUAGE);
@@ -211,8 +207,8 @@ public class MainModule extends AbstractModule {
             int cacheSize = config.getInteger(Keys.GEOCODER_CACHE_SIZE);
             Geocoder geocoder;
             switch (type) {
-                case "test":
-                    geocoder = new TestGeocoder();
+                case "pluscodes":
+                    geocoder = new PlusCodesGeocoder();
                     break;
                 case "nominatim":
                     geocoder = new NominatimGeocoder(client, url, key, language, cacheSize, addressFormat);
