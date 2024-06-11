@@ -1051,7 +1051,7 @@ public class Gl200TextProtocolDecoder extends BaseProtocolDecoder {
 
         position.set(Position.KEY_IGNITION, type.contains("GN"));
         position.set(Position.KEY_HOURS, parseHours(v[index++]));
-        position.set(Position.KEY_ODOMETER, Double.parseDouble(v[index++]) * 1000);
+        position.set(Position.KEY_ODOMETER, Double.parseDouble(v[index]) * 1000);
 
         Date time = dateFormat.parse(v[v.length - 2]);
         if (ignoreFixTime) {
