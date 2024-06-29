@@ -33,6 +33,7 @@ import org.traccar.model.Network;
 import org.traccar.model.Position;
 
 import java.net.SocketAddress;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -201,6 +202,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         buf.readUnsignedByte(); // start marker
         int type = buf.readUnsignedShort();
         int attribute = buf.readUnsignedShort();
+        int length = BitUtil.between(attribute, 0, 9);
         ByteBuf id = buf.readSlice(6); // phone number
         int index;
         if (type == MSG_LOCATION_REPORT_2 || type == MSG_LOCATION_REPORT_BLIND) {
@@ -219,7 +221,11 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         }
 
         if (type == MSG_TERMINAL_REGISTER) {
-
+            if (length >= 9) {
+                buf.readShort(); // reserved
+                buf.readShort(); // reserved
+                deviceSession.set(DeviceSession.KEY_MANUFACTOR, buf.readCharSequence(5, StandardCharsets.US_ASCII).toString());
+            }
             if (channel != null) {
                 ByteBuf response = Unpooled.buffer();
                 response.writeShort(index);
@@ -710,6 +716,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_BATTERY, buf.readUnsignedShort() * 0.001);
                     position.set(Position.KEY_SATELLITES, buf.readUnsignedByte());
                     break;
+                case 0xF1:
+                    position.set(Position.KEY_POWER, buf.readUnsignedInt() * 0.001);
+                    break;
                 case 0xF3:
                     while (buf.readerIndex() < endIndex) {
                         int extendedType = buf.readUnsignedShort();
@@ -771,6 +780,19 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 break;
                         }
                     }
+                    break;
+                case 0xF7:
+                    position.set(Position.KEY_BATTERY, buf.readUnsignedInt() * 0.001);
+                    short batteryStatus = buf.readUnsignedByte();
+                    switch (batteryStatus) {
+                        case 1:
+                            position.set(Position.KEY_CHARGE, false);
+                            break;
+                        case 2:
+                        case 3:
+                            position.set(Position.KEY_CHARGE, true);
+                    }
+                    position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
                     break;
                 case 0xFE:
                     if (length == 1) {

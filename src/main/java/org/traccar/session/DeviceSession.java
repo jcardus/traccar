@@ -74,6 +74,7 @@ public class DeviceSession {
     }
 
     public static final String KEY_TIMEZONE = "timezone";
+    public static final String KEY_MANUFACTOR = "manufactor";
 
     private final Map<String, Object> locals = new HashMap<>();
 
