@@ -15,6 +15,8 @@
  */
 package org.traccar.handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,10 +63,11 @@ public class FilterHandler extends BasePositionHandler {
     private final CacheManager cacheManager;
     private final Storage storage;
     private final StatisticsManager statisticsManager;
+    private final ObjectMapper objectMapper;
 
     @Inject
     public FilterHandler(
-            Config config, CacheManager cacheManager, Storage storage, StatisticsManager statisticsManager) {
+            Config config, CacheManager cacheManager, Storage storage, StatisticsManager statisticsManager, ObjectMapper objectMapper) {
         filterInvalid = config.getBoolean(Keys.FILTER_INVALID);
         filterZero = config.getBoolean(Keys.FILTER_ZERO);
         filterDuplicate = config.getBoolean(Keys.FILTER_DUPLICATE);
@@ -85,6 +88,7 @@ public class FilterHandler extends BasePositionHandler {
         this.cacheManager = cacheManager;
         this.storage = storage;
         this.statisticsManager = statisticsManager;
+        this.objectMapper = objectMapper;
     }
 
     private Position getPrecedingPosition(long deviceId, Date date) throws StorageException {
@@ -268,6 +272,11 @@ public class FilterHandler extends BasePositionHandler {
 
         if (!filterType.isEmpty()) {
             LOGGER.info("Position filtered by {}filters from device: {}", filterType, device.getUniqueId());
+            try {
+                LOGGER.info(objectMapper.writeValueAsString(position));
+            } catch (JsonProcessingException e) {
+                LOGGER.error(e.getMessage(), e);
+            }
             return true;
         }
 
