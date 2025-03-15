@@ -1212,7 +1212,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
             getLastLocation(position, null);
             position.set(Position.KEY_TYPE, type);
-            position.set(Position.KEY_DRIVER_UNIQUE_ID, buf.readCharSequence(buf.readableBytes() - 2, StandardCharsets.US_ASCII).toString().trim());
+            position.set(Position.KEY_DRIVER_UNIQUE_ID,
+                    buf.readCharSequence(buf.readableBytes() - 2, StandardCharsets.US_ASCII).toString().trim());
         }
 
         return null;
