@@ -1206,13 +1206,11 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
             return position;
 
-        } else {
+        } else if (type == 0x64) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
 
             getLastLocation(position, null);
-            position.set(Position.KEY_TYPE, type);
-
             String data = buf.readCharSequence(buf.readableBytes() - 2, StandardCharsets.US_ASCII).toString().trim();
             if (data.startsWith("GTSL")) {
                 String[] values = data.split("\\|");
@@ -1220,6 +1218,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             }
 
             return position;
+        } else {
+            return null;
         }
 
     }
