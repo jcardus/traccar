@@ -1206,7 +1206,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
             return position;
 
-        } else if (type == 0x64) {
+        } else if (type == 0x40) {
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
 
