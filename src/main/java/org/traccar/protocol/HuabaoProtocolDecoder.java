@@ -165,7 +165,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 position.addAlarm(Position.ALARM_MOVEMENT);
             }
             if (BitUtil.check(value, 29) || BitUtil.check(value, 30)) {
-                position.addAlarm(Position.ALARM_ACCIDENT);
+                if (model == null || !model.equals("VL300")) {
+                    position.addAlarm(Position.ALARM_ACCIDENT);
+                }
             }
         }
     }
