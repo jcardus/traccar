@@ -132,6 +132,10 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             if (BitUtil.check(value, 1)) {
                 position.addAlarm(Position.ALARM_TAMPERING);
             }
+        } else if (model != null && Set.of("AL300", "GL100").contains(model)) {
+            if (BitUtil.check(value, 16)) {
+                position.addAlarm(Position.ALARM_MOVEMENT);
+            }
         } else {
             if (BitUtil.check(value, 0)) {
                 position.addAlarm(Position.ALARM_SOS);
