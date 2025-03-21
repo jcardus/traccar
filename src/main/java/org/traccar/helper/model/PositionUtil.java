@@ -27,6 +27,7 @@ import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Order;
 import org.traccar.storage.query.Request;
 
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -38,7 +39,11 @@ public final class PositionUtil {
 
     public static boolean isLatest(CacheManager cacheManager, Position position) {
         Position lastPosition = cacheManager.getPosition(position.getDeviceId());
-        return lastPosition == null || position.getFixTime().compareTo(lastPosition.getFixTime()) >= 0;
+        if (lastPosition == null) { return true; }
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(position.getFixTime());
+        calendar.add(Calendar.SECOND, 1);
+        return calendar.getTime().compareTo(lastPosition.getFixTime()) >= 0;
     }
 
     public static double calculateDistance(Position first, Position last, boolean useOdometer) {
