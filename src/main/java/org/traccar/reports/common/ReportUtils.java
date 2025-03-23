@@ -118,13 +118,17 @@ public class ReportUtils {
         return null;
     }
 
-    public String findDriverName(String driverUniqueId) throws StorageException {
+    public String findDriverName(String driverUniqueId) {
         if (driverUniqueId != null) {
-            Driver driver = storage.getObject(Driver.class, new Request(
-                    new Columns.All(),
-                    new Condition.Equals("uniqueId", driverUniqueId)));
-            if (driver != null) {
-                return driver.getName();
+            try {
+                Driver driver = storage.getObject(Driver.class, new Request(
+                        new Columns.All(),
+                        new Condition.Equals("uniqueId", driverUniqueId)));
+                if (driver != null) {
+                    return driver.getName();
+                }
+            } catch (StorageException ignored) {
+
             }
         }
         return null;

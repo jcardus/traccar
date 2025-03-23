@@ -39,7 +39,9 @@ public final class PositionUtil {
 
     public static boolean isLatest(CacheManager cacheManager, Position position) {
         Position lastPosition = cacheManager.getPosition(position.getDeviceId());
-        if (lastPosition == null) { return true; }
+        if (lastPosition == null) {
+            return true;
+        }
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(position.getFixTime());
         calendar.add(Calendar.SECOND, 1);
