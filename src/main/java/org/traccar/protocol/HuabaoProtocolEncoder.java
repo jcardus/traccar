@@ -88,7 +88,13 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                             0x7e, HuabaoProtocolDecoder.MSG_PARAMETER_SETTING, id, false, data);
                 case Command.TYPE_ENGINE_STOP:
                 case Command.TYPE_ENGINE_RESUME:
-                    if (alternative) {
+                    if ("VL300".equals(getDeviceModel(command.getDeviceId()))) {
+                        return HuabaoProtocolDecoder.formatMessage(
+                                0x7e, HuabaoProtocolDecoder.MSG_TERMINAL_CONTROL, id, false,
+                                command.getType().equals(Command.TYPE_ENGINE_STOP)
+                                        ? Unpooled.wrappedBuffer(DataConverter.parseHex("23303B31"))
+                                        : Unpooled.wrappedBuffer(DataConverter.parseHex("23303B30")));
+                    } else if (alternative) {
                         data.writeByte(command.getType().equals(Command.TYPE_ENGINE_STOP) ? 0x01 : 0x00);
                         data.writeBytes(time);
                         return HuabaoProtocolDecoder.formatMessage(
