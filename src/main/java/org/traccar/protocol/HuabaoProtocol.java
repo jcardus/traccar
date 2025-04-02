@@ -28,6 +28,7 @@ public class HuabaoProtocol extends BaseProtocol {
     @Inject
     public HuabaoProtocol(Config config) {
         setSupportedDataCommands(
+                Command.TYPE_CONFIGURATION,
                 Command.TYPE_CUSTOM,
                 Command.TYPE_REBOOT_DEVICE,
                 Command.TYPE_POSITION_PERIODIC,
