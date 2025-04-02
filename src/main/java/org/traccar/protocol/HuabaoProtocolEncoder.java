@@ -60,7 +60,7 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                     }
                 case Command.TYPE_CONFIGURATION:
                     return HuabaoProtocolDecoder.formatMessage(
-                            0x7e, HuabaoProtocolDecoder.MSG_CONFIG_DEVICE_PARAMS, id, true,
+                            0x7e, HuabaoProtocolDecoder.MSG_CONFIG_DEVICE_PARAMS, id, false,
                             Unpooled.wrappedBuffer(DataConverter.parseHex(command.getString(Command.KEY_DATA))));
                 case Command.TYPE_REBOOT_DEVICE:
                     data.writeByte(1); // number of parameters
