@@ -16,7 +16,6 @@
 package org.traccar.protocol;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
@@ -99,6 +98,13 @@ public class RuptelaProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
+    private String getKeyboardValue(ByteBuf slicedBuf) {
+        slicedBuf.readByte(); // Skip the first byte
+        ByteBuf newBuf = Unpooled.buffer(8);
+        slicedBuf.readBytes(newBuf, 0, 6); // Read 6 bytes
+        return String.valueOf(newBuf.getLongLE(0)); // Read as Little-Endian
+    }
+
     private void decodeParameter(Position position, int id, ByteBuf buf, int length) {
         switch (id) {
             case 2, 3, 4, 5 -> position.set(Position.PREFIX_IN + (id - 1), readValue(buf, length, false));
@@ -110,7 +116,7 @@ public class RuptelaProtocolDecoder extends BaseProtocolDecoder {
             case 29 -> position.set(Position.KEY_POWER, readValue(buf, length, false) * 0.001);
             case 30 -> position.set(Position.KEY_BATTERY, readValue(buf, length, false) * 0.001);
             case 32 -> position.set(Position.KEY_DEVICE_TEMP, readValue(buf, length, true));
-            case 34 -> position.set(Position.KEY_DRIVER_UNIQUE_ID, ByteBufUtil.hexDump(buf.readSlice(length)));
+            case 34 -> position.set(Position.KEY_DRIVER_UNIQUE_ID, getKeyboardValue(buf.readSlice(length)));
             case 39 -> position.set(Position.KEY_ENGINE_LOAD, readValue(buf, length, false));
             case 65 -> position.set(Position.KEY_ODOMETER, readValue(buf, length, false));
             case 74 -> position.set(Position.PREFIX_TEMP + 3, readValue(buf, length, true) * 0.1);
