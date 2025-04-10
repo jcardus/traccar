@@ -102,7 +102,8 @@ public class RuptelaProtocolDecoder extends BaseProtocolDecoder {
         slicedBuf.readByte(); // Skip the first byte
         ByteBuf newBuf = Unpooled.buffer(8);
         slicedBuf.readBytes(newBuf, 0, 6); // Read 6 bytes
-        return String.valueOf(newBuf.getLongLE(0)); // Read as Little-Endian
+        long result = newBuf.getLongLE(0);
+        return result != 0 ? String.valueOf(result) : null;
     }
 
     private void decodeParameter(Position position, int id, ByteBuf buf, int length) {
