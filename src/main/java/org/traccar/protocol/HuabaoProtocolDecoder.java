@@ -765,7 +765,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         int i = 0;
                         while (buf.readerIndex() < endIndex) {
                             i++;
-                            byte mask = buf.readByte();
+                            short mask = buf.readUnsignedByte();
                             buf.skipBytes(6); // mac
                             position.set("tag" + i + "Rssi", buf.readUnsignedByte());
                             if (BitUtil.check(mask, 0)) {
@@ -790,7 +790,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 buf.readShort(); // res1
                             }
                             if (BitUtil.check(mask, 7)) {
-                                buf.readShort(); // res1
+                                buf.readShort(); // res2
                             }
                         }
                         break;
