@@ -784,7 +784,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 position.set("tag" + i + "Humidity", buf.readShort());
                             }
                             if (BitUtil.check(mask, 5)) {
-                                buf.skipBytes(6);
+                                buf.skipBytes(6); // accelerometer
                             }
                             if (BitUtil.check(mask, 6)) {
                                 buf.readShort(); // res1
