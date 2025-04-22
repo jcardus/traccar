@@ -775,7 +775,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 buf.skipBytes(2); // fw version
                             }
                             if (BitUtil.check(mask, 2)) {
-                                position.set("tag" + i + "Battery", buf.readUnsignedShort());
+                                position.set("tag" + i + "Battery", buf.readUnsignedShort() * 0.001);
                             }
                             if (BitUtil.check(mask, 3)) {
                                 position.set("tag" + i + "Temp", buf.readShort() * 0.1);
