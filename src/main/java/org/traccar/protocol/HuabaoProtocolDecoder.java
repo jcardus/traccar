@@ -766,7 +766,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         while (buf.readerIndex() < endIndex) {
                             i++;
                             short mask = buf.readUnsignedByte();
-                            buf.skipBytes(6); // mac
+                            position.set("tag" + i + "Id", ByteBufUtil.hexDump(buf.readSlice(6)));
                             position.set("tag" + i + "Rssi", buf.readUnsignedByte());
                             if (BitUtil.check(mask, 0)) {
                                 buf.skipBytes(10); // name
