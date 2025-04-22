@@ -762,12 +762,12 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     break;
                 case 0xF3:
                     if (model != null && model.equals("VL300")) {
-                        int index = 0;
+                        int i = 0;
                         while (buf.readerIndex() < endIndex) {
-                            index++;
+                            i++;
                             byte mask = buf.readByte();
                             buf.skipBytes(6); // mac
-                            buf.readByte(); // rssi
+                            position.set("tag" + i + "Rssi", buf.readUnsignedByte());
                             if (BitUtil.check(mask, 0)) {
                                 buf.skipBytes(10); // name
                             }
@@ -775,13 +775,13 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 buf.skipBytes(2); // fw version
                             }
                             if (BitUtil.check(mask, 2)) {
-                                buf.skipBytes(2); // voltage
+                                position.set("tag" + i + "Battery", buf.readUnsignedShort());
                             }
                             if (BitUtil.check(mask, 3)) {
-                                position.set(Position.PREFIX_TEMP + index, buf.readShort() * 0.1);
+                                position.set("tag" + i + "Temp", buf.readShort() * 0.1);
                             }
                             if (BitUtil.check(mask, 4)) {
-                                position.set(Position.KEY_HUMIDITY + index, buf.readShort());
+                                position.set("tag" + i + "Humidity", buf.readShort());
                             }
                             if (BitUtil.check(mask, 5)) {
                                 buf.skipBytes(6);
