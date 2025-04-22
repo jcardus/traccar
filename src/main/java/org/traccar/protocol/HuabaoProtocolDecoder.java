@@ -761,6 +761,40 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_POWER, buf.readUnsignedInt() * 0.001);
                     break;
                 case 0xF3:
+                    if (model != null && model.equals("VL300")) {
+                        int index = 0;
+                        while (buf.readerIndex() < endIndex) {
+                            index++;
+                            byte mask = buf.readByte();
+                            buf.skipBytes(6); // mac
+                            buf.readByte(); // rssi
+                            if (BitUtil.check(mask, 0)) {
+                                buf.skipBytes(10); // name
+                            }
+                            if (BitUtil.check(mask, 1)) {
+                                buf.skipBytes(2); // fw version
+                            }
+                            if (BitUtil.check(mask, 2)) {
+                                buf.skipBytes(2); // voltage
+                            }
+                            if (BitUtil.check(mask, 3)) {
+                                position.set(Position.PREFIX_TEMP + index, buf.readShort() * 0.1);
+                            }
+                            if (BitUtil.check(mask, 4)) {
+                                position.set(Position.KEY_HUMIDITY + index, buf.readShort());
+                            }
+                            if (BitUtil.check(mask, 5)) {
+                                buf.skipBytes(6);
+                            }
+                            if (BitUtil.check(mask, 6)) {
+                                buf.readShort(); // res1
+                            }
+                            if (BitUtil.check(mask, 7)) {
+                                buf.readShort(); // res1
+                            }
+                        }
+                        break;
+                    }
                     while (buf.readerIndex() < endIndex) {
                         int extendedType = buf.readUnsignedShort();
                         int extendedLength = buf.readUnsignedByte();
