@@ -775,6 +775,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         while (buf.readerIndex() < endIndex) {
                             i++;
                             short mask = buf.readUnsignedByte();
+                            position.set("mask", mask);
                             position.set("tag" + i + "Id", ByteBufUtil.hexDump(buf.readSlice(6)));
                             position.set("tag" + i + "Rssi", buf.readUnsignedByte());
                             if (BitUtil.check(mask, 0)) {
@@ -787,7 +788,10 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 position.set("tag" + i + "Battery", buf.readUnsignedShort() * 0.001);
                             }
                             if (BitUtil.check(mask, 3)) {
-                                position.set("tag" + i + "Temp", buf.readShort() * 0.1);
+                                short temp = buf.readShort();
+                                if (temp != 0) {
+                                    position.set("tag" + i + "Temp", temp * 0.1);
+                                }
                             }
                             if (BitUtil.check(mask, 4)) {
                                 position.set("tag" + i + "Humidity", buf.readShort());
