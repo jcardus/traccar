@@ -110,7 +110,16 @@ public class RuptelaProtocolDecoder extends BaseProtocolDecoder {
             case 29 -> position.set(Position.KEY_POWER, readValue(buf, length, false) * 0.001);
             case 30 -> position.set(Position.KEY_BATTERY, readValue(buf, length, false) * 0.001);
             case 32 -> position.set(Position.KEY_DEVICE_TEMP, readValue(buf, length, true));
-            case 34 -> position.set(Position.KEY_DRIVER_UNIQUE_ID, ByteBufUtil.hexDump(buf.readSlice(length)));
+            case 34 -> {
+                ByteBuf rawData = buf.readSlice(length);
+                String rawDriverUniqueId = ByteBufUtil.hexDump(rawData.duplicate());
+                rawData.readByte(); //ignore first byte
+                ByteBuf newBuf = Unpooled.buffer(8);
+                rawData.readBytes(newBuf, 0, 6);
+                long result = newBuf.getLongLE(0);
+                position.set(Position.KEY_DRIVER_UNIQUE_ID, result != 0 ? String.valueOf(result) : rawDriverUniqueId);
+                position.set("rawDriverUniqueId", rawDriverUniqueId);
+            }
             case 39 -> position.set(Position.KEY_ENGINE_LOAD, readValue(buf, length, false));
             case 65 -> position.set(Position.KEY_ODOMETER, readValue(buf, length, false));
             case 74 -> position.set(Position.PREFIX_TEMP + 3, readValue(buf, length, true) * 0.1);

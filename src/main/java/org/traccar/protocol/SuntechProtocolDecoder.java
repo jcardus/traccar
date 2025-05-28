@@ -137,10 +137,12 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
         Position position = new Position(getProtocolName());
         position.setDeviceId(deviceSession.getDeviceId());
 
-        if (type.equals("Emergency") || type.equals("Alert")) {
+        if (type.equals("Emergency")) {
+            position.addAlarm(Position.ALARM_SOS);
+        }
+        if (type.equals("Alert")) {
             position.addAlarm(Position.ALARM_GENERAL);
         }
-
         if (!type.equals("Alert") || getProtocolType(deviceSession.getDeviceId()) == 0) {
             position.set(Position.KEY_VERSION_FW, values[index++]);
         }

@@ -823,6 +823,44 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_POWER, buf.readUnsignedInt() * 0.001);
                     break;
                 case 0xF3:
+                    if (model != null && model.equals("VL300")) {
+                        int i = 0;
+                        while (buf.readerIndex() < endIndex) {
+                            i++;
+                            short mask = buf.readUnsignedByte();
+                            position.set("mask", mask);
+                            position.set("tag" + i + "Id", ByteBufUtil.hexDump(buf.readSlice(6)));
+                            position.set("tag" + i + "Rssi", buf.readUnsignedByte());
+                            if (BitUtil.check(mask, 0)) {
+                                buf.skipBytes(10); // name
+                            }
+                            if (BitUtil.check(mask, 1)) {
+                                buf.skipBytes(2); // fw version
+                            }
+                            if (BitUtil.check(mask, 2)) {
+                                position.set("tag" + i + "Battery", buf.readUnsignedShort() * 0.001);
+                            }
+                            if (BitUtil.check(mask, 3)) {
+                                short temp = buf.readShort();
+                                if (temp != 0) {
+                                    position.set("tag" + i + "Temp", temp * 0.1);
+                                }
+                            }
+                            if (BitUtil.check(mask, 4)) {
+                                position.set("tag" + i + "Humidity", buf.readShort());
+                            }
+                            if (BitUtil.check(mask, 5)) {
+                                buf.skipBytes(6); // accelerometer
+                            }
+                            if (BitUtil.check(mask, 6)) {
+                                buf.readShort(); // res1
+                            }
+                            if (BitUtil.check(mask, 7)) {
+                                buf.readShort(); // res2
+                            }
+                        }
+                        break;
+                    }
                     while (buf.readerIndex() < endIndex) {
                         int extendedType = buf.readUnsignedShort();
                         int extendedLength = buf.readUnsignedByte();

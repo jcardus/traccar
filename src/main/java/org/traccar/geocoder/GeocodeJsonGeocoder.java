@@ -22,23 +22,9 @@ import jakarta.ws.rs.client.Client;
 
 public class GeocodeJsonGeocoder extends JsonGeocoder {
 
-    private static String formatUrl(String url, String key, String language) {
-        if (url == null) {
-            url = "https://photon.komoot.io/reverse";
-        }
-        url += "?lat=%f&lon=%f";
-        if (key != null) {
-            url += "&key=" + key;
-        }
-        if (language != null) {
-            url += "&lang=" + language;
-        }
-        return url;
-    }
-
     public GeocodeJsonGeocoder(
             Client client, String url, String key, String language, int cacheSize, AddressFormat addressFormat) {
-        super(client, formatUrl(url, key, language), cacheSize, addressFormat);
+        super(client, url, cacheSize, addressFormat);
     }
 
     @Override
