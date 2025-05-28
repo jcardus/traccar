@@ -162,11 +162,42 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
 
         position.setValid(values[index++].equals("1"));
 
-        if (getProtocolType(deviceSession.getDeviceId()) == 1) {
-            position.set(Position.KEY_ODOMETER, Integer.parseInt(values[index++]));
-        }
+        double voltage = Double.parseDouble(values[index]);
+        position.set(Position.KEY_BATTERY, voltage);
+        double batteryPercentage = getBatteryPercentage(voltage);
+
+        position.set(Position.KEY_BATTERY_LEVEL, batteryPercentage);
 
         return position;
+    }
+
+    private static double getBatteryPercentage(double voltage) {
+        double batteryPercentage;
+
+        if (voltage >= 4.06) {
+            batteryPercentage = 100;
+        } else if (voltage >= 3.97) {
+            batteryPercentage = 90;
+        } else if (voltage >= 3.89) {
+            batteryPercentage = 80;
+        } else if (voltage >= 3.83) {
+            batteryPercentage = 70;
+        } else if (voltage >= 3.77) {
+            batteryPercentage = 60;
+        } else if (voltage >= 3.75) {
+            batteryPercentage = 50;
+        } else if (voltage >= 3.73) {
+            batteryPercentage = 40;
+        } else if (voltage >= 3.66) {
+            batteryPercentage = 30;
+        } else if (voltage >= 3.53) {
+            batteryPercentage = 20;
+        } else if (voltage >= 3.49) {
+            batteryPercentage = 10;
+        } else {
+            batteryPercentage = 0;
+        }
+        return batteryPercentage;
     }
 
     private String decodeEmergency(int value) {
@@ -278,7 +309,7 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
 
             position.set(Position.KEY_SATELLITES, Integer.parseInt(values[index++]));
 
-            position.setValid(values[index++].equals("1"));
+            position.setValid(values[index].equals("1"));
 
         }
 
@@ -843,7 +874,7 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
     private Position decodeTravelReport(Channel channel, SocketAddress remoteAddress, String[] values) {
         int index = 1;
 
-        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, values[index++]);
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, values[index]);
         if (deviceSession == null) {
             return null;
         }
