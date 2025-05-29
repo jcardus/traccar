@@ -164,27 +164,14 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
 
         double voltage = Double.parseDouble(values[index]);
         position.set(Position.KEY_BATTERY, voltage);
-        double batteryPercentage = getBatteryPercentage(voltage);
-
-        position.set(Position.KEY_BATTERY_LEVEL, batteryPercentage);
+        position.set(Position.KEY_BATTERY_LEVEL, getBatteryPercentage(voltage));
 
         return position;
     }
 
-    public static double getBatteryPercentage(double voltage) {
-        if (voltage >= 4.20) return 100;
-        if (voltage >= 4.15) return 95;
-        if (voltage >= 4.10) return 90;
-        if (voltage >= 4.00) return 80;
-        if (voltage >= 3.90) return 70;
-        if (voltage >= 3.80) return 60;
-        if (voltage >= 3.70) return 50;
-        if (voltage >= 3.60) return 40;
-        if (voltage >= 3.50) return 30;
-        if (voltage >= 3.40) return 20;
-        if (voltage >= 3.30) return 10;
-        if (voltage >= 3.20) return 5;
-        return 0;
+    public static int getBatteryPercentage(double voltage) {
+        double percent = 100 / (1 + Math.exp(-6.13 * (voltage - 3.7)));
+        return (int) Math.round(percent);
     }
 
     private String decodeEmergency(int value) {
