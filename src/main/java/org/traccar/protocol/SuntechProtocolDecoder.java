@@ -171,33 +171,20 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
         return position;
     }
 
-    private static double getBatteryPercentage(double voltage) {
-        double batteryPercentage;
-
-        if (voltage >= 4.06) {
-            batteryPercentage = 100;
-        } else if (voltage >= 3.97) {
-            batteryPercentage = 90;
-        } else if (voltage >= 3.89) {
-            batteryPercentage = 80;
-        } else if (voltage >= 3.83) {
-            batteryPercentage = 70;
-        } else if (voltage >= 3.77) {
-            batteryPercentage = 60;
-        } else if (voltage >= 3.75) {
-            batteryPercentage = 50;
-        } else if (voltage >= 3.73) {
-            batteryPercentage = 40;
-        } else if (voltage >= 3.66) {
-            batteryPercentage = 30;
-        } else if (voltage >= 3.53) {
-            batteryPercentage = 20;
-        } else if (voltage >= 3.49) {
-            batteryPercentage = 10;
-        } else {
-            batteryPercentage = 0;
-        }
-        return batteryPercentage;
+    public static double getBatteryPercentage(double voltage) {
+        if (voltage >= 4.20) return 100;
+        if (voltage >= 4.15) return 95;
+        if (voltage >= 4.10) return 90;
+        if (voltage >= 4.00) return 80;
+        if (voltage >= 3.90) return 70;
+        if (voltage >= 3.80) return 60;
+        if (voltage >= 3.70) return 50;
+        if (voltage >= 3.60) return 40;
+        if (voltage >= 3.50) return 30;
+        if (voltage >= 3.40) return 20;
+        if (voltage >= 3.30) return 10;
+        if (voltage >= 3.20) return 5;
+        return 0;
     }
 
     private String decodeEmergency(int value) {
