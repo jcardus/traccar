@@ -110,8 +110,8 @@ public class ProcessingHandler extends ChannelInboundHandlerAdapter implements B
                 EngineHoursHandler.class,
                 DriverHandler.class,
                 CopyAttributesHandler.class,
-                PositionForwardingHandler.class,
-                DatabaseHandler.class)
+                DatabaseHandler.class,
+                PositionForwardingHandler.class)
                 .map((clazz) -> (BasePositionHandler) injector.getInstance(clazz))
                 .filter(Objects::nonNull)
                 .toList();
