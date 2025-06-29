@@ -435,7 +435,7 @@ public final class QueryBuilder {
                                 continue;
                             }
 
-                            addProcessors(processors, method.getParameterTypes()[0], method, name);
+                            addProcessors(processors, method.getParameterTypes()[0], method, name.toLowerCase());
                         }
                     }
 

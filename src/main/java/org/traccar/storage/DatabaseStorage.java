@@ -196,7 +196,7 @@ public class DatabaseStorage extends Storage {
         }
     }
 
-    private String getStorageName(Class<?> clazz) throws StorageException {
+    String getStorageName(Class<?> clazz) throws StorageException {
         StorageName storageName = clazz.getAnnotation(StorageName.class);
         if (storageName == null) {
             throw new StorageException("StorageName annotation is missing");
@@ -204,7 +204,7 @@ public class DatabaseStorage extends Storage {
         return storageName.value();
     }
 
-    private Map<String, Object> getConditionVariables(Condition genericCondition) {
+    Map<String, Object> getConditionVariables(Condition genericCondition) {
         Map<String, Object> results = new HashMap<>();
         if (genericCondition instanceof Condition.Compare condition) {
             if (condition.getValue() != null) {
@@ -230,11 +230,11 @@ public class DatabaseStorage extends Storage {
         return results;
     }
 
-    private String formatColumns(List<String> columns, Function<String, String> mapper) {
+    String formatColumns(List<String> columns, Function<String, String> mapper) {
         return columns.stream().map(mapper).collect(Collectors.joining(", "));
     }
 
-    private String formatCondition(Condition genericCondition) throws StorageException {
+    String formatCondition(Condition genericCondition) throws StorageException {
         return formatCondition(genericCondition, true);
     }
 
@@ -289,7 +289,7 @@ public class DatabaseStorage extends Storage {
         return result.toString();
     }
 
-    private String formatOrder(Order order) {
+    String formatOrder(Order order) {
         StringBuilder result = new StringBuilder();
         if (order != null) {
             result.append(" ORDER BY ");
