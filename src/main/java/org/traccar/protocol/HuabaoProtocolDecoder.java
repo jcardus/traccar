@@ -1141,7 +1141,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
             getLastLocation(position, null);
             String data = buf.readCharSequence(buf.readableBytes(), StandardCharsets.US_ASCII).toString().trim();
-            if (data.startsWith("GTSL")) {
+            if (data.startsWith("GTSL") || data.startsWith("SGBT")) {
                 String[] values = data.split("\\|");
                 if (values.length > 4) {
                     position.set(Position.KEY_DRIVER_UNIQUE_ID, values[4]);
