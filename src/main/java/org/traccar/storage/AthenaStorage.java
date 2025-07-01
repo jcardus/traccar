@@ -1,8 +1,7 @@
 package org.traccar.storage;
 
+import com.amazon.athena.jdbc.AthenaDataSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 import jakarta.inject.Inject;
 import org.traccar.config.Config;
 import org.traccar.storage.query.Columns;
@@ -18,38 +17,22 @@ import java.util.*;
 public class AthenaStorage extends DatabaseStorage {
     private final ObjectMapper objectMapper;
     private final Config config;
+    private final AthenaDataSource athenaDataSource;
 
     @Inject
     public AthenaStorage(Config config, DataSource dataSource, ObjectMapper objectMapper) {
         super(config, dataSource, objectMapper);
-        String jdbcUrl = "jdbc:athena://Region=us-east-1";
-
-        // Athena connection properties
-        Properties props = new Properties();
-        props.setProperty("User", System.getenv("ATHENA_AWS_ACCESS_KEY_ID"));
-        props.setProperty("Password", System.getenv("ATHENA_AWS_SECRET_ACCESS_KEY"));
-        props.setProperty("OutputLocation", "s3://traccar-athena-positions");
-        props.setProperty("Database", "traccar_positions");
-        props.setProperty("Catalog", "AwsDataCatalog");
-
-        // HikariCP config
-        HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setJdbcUrl(jdbcUrl);
-        hikariConfig.setDataSourceProperties(props);
-        hikariConfig.setDriverClassName("com.amazon.athena.jdbc.AthenaDriver");
-        hikariConfig.setMaximumPoolSize(1);
-        hikariConfig.setMinimumIdle(0);
-        hikariConfig.setIdleTimeout(0);
-        hikariConfig.setInitializationFailTimeout(-1);
-
-        athenaDataSource = new HikariDataSource(hikariConfig);
         this.config = config;
         this.objectMapper = objectMapper;
+        this.athenaDataSource = new AthenaDataSource();
+        this.athenaDataSource.setAccessKeyId(System.getenv("ATHENA_AWS_ACCESS_KEY_ID"));
+        this.athenaDataSource.setSecretAccessKey(System.getenv("ATHENA_AWS_SECRET_ACCESS_KEY"));
+        this.athenaDataSource.setOutputLocation("s3://traccar-athena-positions");
+        this.athenaDataSource.setDatabase("traccar_positions");
+        this.athenaDataSource.setCatalog("AwsDataCatalog");
+        this.athenaDataSource.setRegion("us-east-1");
+        this.athenaDataSource.setConnectionTest("FALSE");
     }
-
-    private final DataSource athenaDataSource;
-
-
 
     @Override
     public <T> List<T> getObjects(Class<T> clazz, Request request) throws StorageException {
