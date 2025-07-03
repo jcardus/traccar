@@ -27,7 +27,7 @@ public class AthenaStorage extends DatabaseStorage {
         this.athenaDataSource = new AthenaDataSource();
         this.athenaDataSource.setAccessKeyId(System.getenv("ATHENA_AWS_ACCESS_KEY_ID"));
         this.athenaDataSource.setSecretAccessKey(System.getenv("ATHENA_AWS_SECRET_ACCESS_KEY"));
-        this.athenaDataSource.setOutputLocation("s3://traccar-athena-positions");
+        this.athenaDataSource.setOutputLocation("s3://traccar-athena-output");
         this.athenaDataSource.setDatabase("traccar_positions");
         this.athenaDataSource.setCatalog("AwsDataCatalog");
         this.athenaDataSource.setRegion("us-east-1");
