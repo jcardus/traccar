@@ -28,8 +28,8 @@ import org.traccar.storage.query.Order;
 import org.traccar.storage.query.Request;
 
 import java.util.Date;
-import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public final class PositionUtil {
 
@@ -54,28 +54,23 @@ public final class PositionUtil {
         return distance;
     }
 
-    public static List<Position> getPositions(
+    public static Stream<Position> getPositions(
             Storage storage, long deviceId, Date from, Date to) throws StorageException {
-        try (var positions = storage.getObjects(Position.class, new Request(
+        return storage.getObjects(Position.class, new Request(
                 new Columns.All(),
                 new Condition.And(
                         new Condition.Equals("deviceId", deviceId),
                         new Condition.Between("fixTime", "from", from, "to", to)),
-                new Order("fixTime")))) {
-            return positions.collect(Collectors.toList());
-        }
+                new Order("fixTime")));
     }
 
-    public static List<Position> getLatestPositions(Storage storage, long userId) throws StorageException {
+    public static Stream<Position> getLatestPositions(Storage storage, long userId) throws StorageException {
         try (var devices = storage.getObjects(Device.class, new Request(
                 new Columns.Include("id"),
-                new Condition.Permission(User.class, userId, Device.class)));
-            var positions = storage.getObjects(Position.class, new Request(
-                        new Columns.All(), new Condition.LatestPositions()))) {
+                new Condition.Permission(User.class, userId, Device.class)))) {
             var deviceIds = devices.map(BaseModel::getId).collect(Collectors.toUnmodifiableSet());
-            return positions
-                    .filter(position -> deviceIds.contains(position.getDeviceId()))
-                    .collect(Collectors.toList());
+            return storage.getObjects(Position.class, new Request(new Columns.All(), new Condition.LatestPositions()))
+                .filter(position -> deviceIds.contains(position.getDeviceId()));
         }
     }
 

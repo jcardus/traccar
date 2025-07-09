@@ -304,55 +304,58 @@ public class ReportUtils {
                 new AttributeUtil.StorageProvider(config, storage, permissionsService, device));
         boolean ignoreOdometer = tripsConfig.getIgnoreOdometer();
 
-        var positions = PositionUtil.getPositions(storage, device.getId(), from, to);
-        if (!positions.isEmpty()) {
-            boolean trips = reportClass.equals(TripReportItem.class);
+        try (
+            var stream = PositionUtil.getPositions(storage, device.getId(), from, to)) {
+            var positions = stream.collect(Collectors.toList());
+            if (!positions.isEmpty()) {
+                boolean trips = reportClass.equals(TripReportItem.class);
 
-            MotionState motionState = new MotionState();
-            boolean initialValue = isMoving(positions, 0, tripsConfig);
-            motionState.setMotionStreak(initialValue);
-            motionState.setMotionState(initialValue);
+                MotionState motionState = new MotionState();
+                boolean initialValue = isMoving(positions, 0, tripsConfig);
+                motionState.setMotionStreak(initialValue);
+                motionState.setMotionState(initialValue);
 
-            boolean detected = trips == motionState.getMotionState();
-            double maxSpeed = 0;
-            int startEventIndex = detected ? 0 : -1;
-            int startNoEventIndex = -1;
-            for (int i = 0; i < positions.size(); i++) {
-                boolean motion = isMoving(positions, i, tripsConfig);
-                if (motionState.getMotionState() != motion) {
-                    if (motion == trips) {
-                        if (!detected) {
-                            startEventIndex = i;
-                            maxSpeed = positions.get(i).getSpeed();
+                boolean detected = trips == motionState.getMotionState();
+                double maxSpeed = 0;
+                int startEventIndex = detected ? 0 : -1;
+                int startNoEventIndex = -1;
+                for (int i = 0; i < positions.size(); i++) {
+                    boolean motion = isMoving(positions, i, tripsConfig);
+                    if (motionState.getMotionState() != motion) {
+                        if (motion == trips) {
+                            if (!detected) {
+                                startEventIndex = i;
+                                maxSpeed = positions.get(i).getSpeed();
+                            }
+                            startNoEventIndex = -1;
+                        } else {
+                            startNoEventIndex = i;
                         }
-                        startNoEventIndex = -1;
                     } else {
-                        startNoEventIndex = i;
+                        maxSpeed = Math.max(maxSpeed, positions.get(i).getSpeed());
                     }
-                } else {
-                    maxSpeed = Math.max(maxSpeed, positions.get(i).getSpeed());
-                }
 
-                MotionProcessor.updateState(motionState, positions.get(i), motion, tripsConfig);
-                if (motionState.getEvent() != null) {
-                    if (motion == trips) {
-                        detected = true;
-                        startNoEventIndex = -1;
-                    } else if (startEventIndex >= 0 && startNoEventIndex >= 0) {
-                        result.add(calculateTripOrStop(
-                                device, positions.get(startEventIndex), positions.get(startNoEventIndex),
-                                maxSpeed, ignoreOdometer, reportClass));
-                        detected = false;
-                        startEventIndex = -1;
-                        startNoEventIndex = -1;
+                    MotionProcessor.updateState(motionState, positions.get(i), motion, tripsConfig);
+                    if (motionState.getEvent() != null) {
+                        if (motion == trips) {
+                            detected = true;
+                            startNoEventIndex = -1;
+                        } else if (startEventIndex >= 0 && startNoEventIndex >= 0) {
+                            result.add(calculateTripOrStop(
+                                    device, positions.get(startEventIndex), positions.get(startNoEventIndex),
+                                    maxSpeed, ignoreOdometer, reportClass));
+                            detected = false;
+                            startEventIndex = -1;
+                            startNoEventIndex = -1;
+                        }
                     }
                 }
-            }
-            if (detected & startEventIndex >= 0 && startEventIndex < positions.size() - 1) {
-                int endIndex = startNoEventIndex >= 0 ? startNoEventIndex : positions.size() - 1;
-                result.add(calculateTripOrStop(
-                        device, positions.get(startEventIndex), positions.get(endIndex),
-                        maxSpeed, ignoreOdometer, reportClass));
+                if (detected & startEventIndex >= 0 && startEventIndex < positions.size() - 1) {
+                    int endIndex = startNoEventIndex >= 0 ? startNoEventIndex : positions.size() - 1;
+                    result.add(calculateTripOrStop(
+                            device, positions.get(startEventIndex), positions.get(endIndex),
+                            maxSpeed, ignoreOdometer, reportClass));
+                }
             }
         }
 

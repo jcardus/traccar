@@ -35,6 +35,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class AsyncSocket extends WebSocketAdapter implements ConnectionManager.UpdateListener {
 
@@ -63,9 +64,9 @@ public class AsyncSocket extends WebSocketAdapter implements ConnectionManager.U
     public void onWebSocketConnect(Session session) {
         super.onWebSocketConnect(session);
 
-        try {
+        try (var positions = PositionUtil.getLatestPositions(storage, userId)) {
             Map<String, Collection<?>> data = new HashMap<>();
-            data.put(KEY_POSITIONS, PositionUtil.getLatestPositions(storage, userId));
+            data.put(KEY_POSITIONS, positions.collect(Collectors.toList()));
             sendData(data);
             connectionManager.addListener(userId, this);
         } catch (StorageException e) {

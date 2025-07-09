@@ -44,11 +44,11 @@ public class KmlExportProvider {
 
         var device = storage.getObject(Device.class, new Request(
                 new Columns.All(), new Condition.Equals("id", deviceId)));
-        var positions = PositionUtil.getPositions(storage, deviceId, from, to);
 
         var dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
-        try (PrintWriter writer = new PrintWriter(outputStream)) {
+        try (PrintWriter writer = new PrintWriter(outputStream);
+            var positions = PositionUtil.getPositions(storage, deviceId, from, to)) {
             writer.print("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
             writer.print("<kml xmlns=\"http://www.opengis.net/kml/2.2\">");
             writer.print("<Document>");
@@ -66,7 +66,7 @@ public class KmlExportProvider {
             writer.print("<tessellate>1</tessellate>");
             writer.print("<altitudeMode>absolute</altitudeMode>");
             writer.print("<coordinates>");
-            writer.print(positions.stream()
+            writer.print(positions
                     .map((p -> String.format("%f,%f,%f", p.getLongitude(), p.getLatitude(), p.getAltitude())))
                     .collect(Collectors.joining(" ")));
             writer.print("</coordinates>");

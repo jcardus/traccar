@@ -15,6 +15,8 @@
  */
 package org.traccar.api.resource;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.traccar.api.BaseResource;
 import org.traccar.helper.model.PositionUtil;
 import org.traccar.model.Device;
@@ -41,12 +43,11 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
-import java.util.ArrayList;
-import java.util.Collection;
+import java.io.IOException;
 import java.util.Date;
 import java.util.List;
 import java.util.LinkedList;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Path("positions")
 @Produces(MediaType.APPLICATION_JSON)
@@ -62,34 +63,60 @@ public class PositionResource extends BaseResource {
     @Inject
     private GpxExportProvider gpxExportProvider;
 
+    @Inject
+    private ObjectMapper objectMapper;
+
     @GET
-    public Collection<Position> getJson(
+    public Response getJson(
             @QueryParam("deviceId") long deviceId, @QueryParam("id") List<Long> positionIds,
-            @QueryParam("from") Date from, @QueryParam("to") Date to)
-            throws StorageException {
-        if (!positionIds.isEmpty()) {
-            var positions = new ArrayList<Position>();
-            for (long positionId : positionIds) {
-                Position position = storage.getObject(Position.class, new Request(
-                        new Columns.All(), new Condition.Equals("id", positionId)));
-                permissionsService.checkPermission(Device.class, getUserId(), position.getDeviceId());
-                positions.add(position);
-            }
-            return positions;
-        } else if (deviceId > 0) {
-            permissionsService.checkPermission(Device.class, getUserId(), deviceId);
-            if (from != null && to != null) {
-                permissionsService.checkRestriction(getUserId(), UserRestrictions::getDisableReports);
-                return PositionUtil.getPositions(storage, deviceId, from, to);
-            } else {
-                try (var positions = storage.getObjects(Position.class, new Request(
-                        new Columns.All(), new Condition.LatestPositions(deviceId)))) {
-                    return positions.collect(Collectors.toList());
+            @QueryParam("from") Date from, @QueryParam("to") Date to) {
+        StreamingOutput stream = output -> {
+            try (JsonGenerator generator = objectMapper.getFactory().createGenerator(output)) {
+                generator.writeStartArray();
+                if (!positionIds.isEmpty()) {
+                    for (long positionId : positionIds) {
+                        Position position = storage.getObject(Position.class, new Request(
+                                new Columns.All(), new Condition.Equals("id", positionId)));
+                        permissionsService.checkPermission(Device.class, getUserId(), position.getDeviceId());
+                        objectMapper.writeValue(generator, position);
+                    }
+                } else if (deviceId > 0) {
+                    permissionsService.checkPermission(Device.class, getUserId(), deviceId);
+                    if (from != null && to != null) {
+                        permissionsService.checkRestriction(getUserId(), UserRestrictions::getDisableReports);
+                        try (var positions = PositionUtil.getPositions(storage, deviceId, from, to)) {
+                            writeValues(positions, generator);
+                        }
+                    } else {
+                        try (var positions = storage.getObjects(Position.class, new Request(
+                                new Columns.All(), new Condition.LatestPositions(deviceId)))) {
+                            writeValues(positions, generator);
+                        }
+                    }
+                } else {
+                    try (var positions = PositionUtil.getLatestPositions(storage, getUserId())) {
+                        writeValues(positions, generator);
+                    }
                 }
+                generator.writeEndArray();
+            } catch (StorageException e) {
+                throw new RuntimeException(e);
             }
-        } else {
-            return PositionUtil.getLatestPositions(storage, getUserId());
-        }
+        };
+        return Response.ok(stream)
+                .type(MediaType.APPLICATION_JSON)
+                .build();
+    }
+
+    private void writeValues(Stream<Position> positions, JsonGenerator generator) {
+        positions.forEach(position -> {
+            try {
+                objectMapper.writeValue(generator, position);
+                generator.flush();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 
     @Path("{id}")

@@ -57,27 +57,29 @@ public class CombinedReportProvider {
         for (Device device: DeviceUtil.getAccessibleDevices(storage, userId, deviceIds, groupIds)) {
             CombinedReportItem item = new CombinedReportItem();
             item.setDeviceId(device.getId());
-            var positions = PositionUtil.getPositions(storage, device.getId(), from, to);
-            item.setRoute(positions.stream()
-                    .map(p -> new double[] {p.getLongitude(), p.getLatitude()})
-                    .collect(Collectors.toList()));
-            try (var stream = storage.getObjects(Event.class, new Request(
-                    new Columns.All(),
-                    new Condition.And(
-                            new Condition.Equals("deviceId", device.getId()),
-                            new Condition.Between("eventTime", "from", from, "to", to)),
-                    new Order("eventTime")))) {
-                var events = stream.collect(Collectors.toList());
-                item.setEvents(events.stream()
-                        .filter(e -> e.getPositionId() > 0 && !EXCLUDE_TYPES.contains(e.getType()))
+            try (var positionStream = PositionUtil.getPositions(storage, device.getId(), from, to)) {
+                 var positions = positionStream.collect(Collectors.toList());
+                item.setRoute(positions.stream()
+                        .map(p -> new double[] {p.getLongitude(), p.getLatitude()})
                         .collect(Collectors.toList()));
-                var eventPositions = events.stream()
-                        .map(Event::getPositionId)
-                        .collect(Collectors.toSet());
-                item.setPositions(positions.stream()
-                        .filter(p -> eventPositions.contains(p.getId()))
-                        .collect(Collectors.toList()));
-                result.add(item);
+                try (var stream = storage.getObjects(Event.class, new Request(
+                        new Columns.All(),
+                        new Condition.And(
+                                new Condition.Equals("deviceId", device.getId()),
+                                new Condition.Between("eventTime", "from", from, "to", to)),
+                        new Order("eventTime")))) {
+                    var events = stream.collect(Collectors.toList());
+                    item.setEvents(events.stream()
+                            .filter(e -> e.getPositionId() > 0 && !EXCLUDE_TYPES.contains(e.getType()))
+                            .collect(Collectors.toList()));
+                    var eventPositions = events.stream()
+                            .map(Event::getPositionId)
+                            .collect(Collectors.toSet());
+                    item.setPositions(positions.stream()
+                            .filter(p -> eventPositions.contains(p.getId()))
+                            .collect(Collectors.toList()));
+                    result.add(item);
+                }
             }
         }
         return result;

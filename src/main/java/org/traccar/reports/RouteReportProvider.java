@@ -44,6 +44,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
 public class RouteReportProvider {
 
@@ -66,7 +67,9 @@ public class RouteReportProvider {
 
         ArrayList<Position> result = new ArrayList<>();
         for (Device device: DeviceUtil.getAccessibleDevices(storage, userId, deviceIds, groupIds)) {
-            result.addAll(PositionUtil.getPositions(storage, device.getId(), from, to));
+            try (var positions = PositionUtil.getPositions(storage, device.getId(), from, to)) {
+                result.addAll(positions.collect(Collectors.toList()));
+            }
         }
         return result;
     }
@@ -85,19 +88,20 @@ public class RouteReportProvider {
         ArrayList<DeviceReportSection> devicesRoutes = new ArrayList<>();
         ArrayList<String> sheetNames = new ArrayList<>();
         for (Device device: DeviceUtil.getAccessibleDevices(storage, userId, deviceIds, groupIds)) {
-            var positions = PositionUtil.getPositions(storage, device.getId(), from, to);
-            DeviceReportSection deviceRoutes = new DeviceReportSection();
-            deviceRoutes.setDeviceName(device.getName());
-            sheetNames.add(WorkbookUtil.createSafeSheetName(getUniqueSheetName(deviceRoutes.getDeviceName())));
-            if (device.getGroupId() > 0) {
-                Group group = storage.getObject(Group.class, new Request(
-                        new Columns.All(), new Condition.Equals("id", device.getGroupId())));
-                if (group != null) {
-                    deviceRoutes.setGroupName(group.getName());
+            try (var positions = PositionUtil.getPositions(storage, device.getId(), from, to)) {
+                DeviceReportSection deviceRoutes = new DeviceReportSection();
+                deviceRoutes.setDeviceName(device.getName());
+                sheetNames.add(WorkbookUtil.createSafeSheetName(getUniqueSheetName(deviceRoutes.getDeviceName())));
+                if (device.getGroupId() > 0) {
+                    Group group = storage.getObject(Group.class, new Request(
+                            new Columns.All(), new Condition.Equals("id", device.getGroupId())));
+                    if (group != null) {
+                        deviceRoutes.setGroupName(group.getName());
+                    }
                 }
+                deviceRoutes.setObjects(positions.collect(Collectors.toList()));
+                devicesRoutes.add(deviceRoutes);
             }
-            deviceRoutes.setObjects(positions);
-            devicesRoutes.add(deviceRoutes);
         }
 
         File file = Paths.get(config.getString(Keys.TEMPLATES_ROOT), "export", "route.xlsx").toFile();

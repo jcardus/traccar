@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class SummaryReportProvider {
 
@@ -90,15 +91,16 @@ public class SummaryReportProvider {
             first = getEdgePosition(device.getId(), from, to, false);
             last = getEdgePosition(device.getId(), from, to, true);
         } else {
-            var positions = PositionUtil.getPositions(storage, device.getId(), from, to);
-            for (Position position : positions) {
-                if (first == null) {
-                    first = position;
+            try (var positions = PositionUtil.getPositions(storage, device.getId(), from, to)) {
+                for (Position position : positions.collect(Collectors.toList())) {
+                    if (first == null) {
+                        first = position;
+                    }
+                    if (position.getSpeed() > result.getMaxSpeed()) {
+                        result.setMaxSpeed(position.getSpeed());
+                    }
+                    last = position;
                 }
-                if (position.getSpeed() > result.getMaxSpeed()) {
-                    result.setMaxSpeed(position.getSpeed());
-                }
-                last = position;
             }
         }
 
