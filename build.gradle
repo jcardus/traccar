@@ -57,7 +57,38 @@ protobuf {
     }
 }
 
+def zipUrl = 'https://jcardus.github.io/libs/athena-jdbc.zip'
+def zipFile = file("$buildDir/downloads/athena-jdbc.zip")
+def unzipDir = file("$buildDir/unzipped/athena-jdbc")
+
+tasks.register('downloadAthenaJdbc') {
+    outputs.file(zipFile)
+    doLast {
+        println "Downloading Athena JDBC ZIP..."
+        ant.get(src: zipUrl, dest: zipFile)
+    }
+}
+
+tasks.named('extractIncludeTestProto') {
+    dependsOn('unzipAthenaJdbc')
+}
+
+tasks.named("extractIncludeProto") {
+    dependsOn("unzipAthenaJdbc")
+}
+
+tasks.register('unzipAthenaJdbc', Copy) {
+    dependsOn 'downloadAthenaJdbc'
+    from zipTree(zipFile)
+    into unzipDir
+}
+
+tasks.named('compileJava') {
+    dependsOn 'unzipAthenaJdbc'
+}
+
 dependencies {
+    implementation fileTree(dir: "$buildDir/unzipped/athena-jdbc", include: ['**/*.jar'])
     implementation "commons-codec:commons-codec:1.18.0"
     implementation "com.h2database:h2:2.3.232"
     implementation "com.mysql:mysql-connector-j:9.3.0"
@@ -124,6 +155,7 @@ test {
 }
 
 tasks.register('copyDependencies', Copy) {
+    dependsOn("unzipAthenaJdbc")
     into "$projectDir/target/lib"
     from configurations.runtimeClasspath
 }

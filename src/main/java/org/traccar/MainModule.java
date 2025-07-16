@@ -94,7 +94,7 @@ import org.traccar.sms.SmsManager;
 import org.traccar.sms.SnsSmsClient;
 import org.traccar.speedlimit.OverpassSpeedLimitProvider;
 import org.traccar.speedlimit.SpeedLimitProvider;
-import org.traccar.storage.DatabaseStorage;
+import org.traccar.storage.AthenaStorage;
 import org.traccar.storage.MemoryStorage;
 import org.traccar.storage.Storage;
 import org.traccar.web.WebServer;
@@ -137,7 +137,7 @@ public class MainModule extends AbstractModule {
         if (config.getBoolean(Keys.DATABASE_MEMORY)) {
             return injector.getInstance(MemoryStorage.class);
         } else {
-            return injector.getInstance(DatabaseStorage.class);
+            return injector.getInstance(AthenaStorage.class);
         }
     }
 
