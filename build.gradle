@@ -88,6 +88,9 @@ tasks.named('compileJava') {
 }
 
 dependencies {
+    implementation 'com.amazonaws:aws-lambda-java-core:1.2.3'
+    implementation 'com.amazonaws:aws-lambda-java-events:3.11.0'
+    implementation 'com.amazonaws:aws-java-sdk-s3:1.12.529'
     implementation fileTree(dir: "$buildDir/unzipped/athena-jdbc", include: ['**/*.jar'])
     implementation "commons-codec:commons-codec:1.18.0"
     implementation "com.h2database:h2:2.3.232"

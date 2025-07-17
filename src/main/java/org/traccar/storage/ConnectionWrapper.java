@@ -1,8 +1,11 @@
 package org.traccar.storage;
-import java.lang.reflect.*;
+import java.lang.reflect.Proxy;
 import java.sql.Connection;
 
-public class ConnectionWrapper {
+final class ConnectionWrapper {
+    private ConnectionWrapper() {
+    }
+
     public static Connection wrap(Connection originalConnection) {
         return (Connection) Proxy.newProxyInstance(
                 Connection.class.getClassLoader(),

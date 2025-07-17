@@ -16,7 +16,9 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Objects;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -62,31 +64,32 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
         }
         query.append(" FROM ").append(getStorageName(clazz));
         query.append(formatCondition(request.getCondition()));
-        query.append(formatOrder(request.getOrder()));
 
 
-        List<Condition> conditions = List.of(((Condition.Binary) request.getCondition()).getFirst(),((Condition.Binary) request.getCondition()).getSecond());
+        List<Condition> conditions = List.of(
+                ((Condition.Binary) request.getCondition()).getFirst(),
+                ((Condition.Binary) request.getCondition()).getSecond());
         for (Condition c : conditions) {
-            if (c instanceof Condition.LatestPositions condition) {
-                query.append(String.format(" AND deviceid_shard='%d' ", condition.getDeviceId()/10));
+            if (c instanceof Condition.Equals condition) {
+                query.append(String.format(" AND deviceid_shard='%d' ", (Long) condition.getValue() / 10));
             }
             if (c instanceof Condition.Between condition) {
                 long filterPast = config.getLong(Keys.FILTER_PAST) * 1000;
                 Date s3Date = new Date(System.currentTimeMillis() - filterPast);
                 LOGGER.info("Filtering past positions older than {}, filterPast {}", s3Date, filterPast);
-                Date fromDate = (Date)condition.getFromValue();
+                Date fromDate = (Date) condition.getFromValue();
                 if (filterPast == 0 || fromDate.after(s3Date)) {
                     return super.getObjectsStream(clazz, request);
                 }
                 String from = new SimpleDateFormat("yyyy-MM-dd").format(fromDate);
                 query.append(String.format(" AND date >='%s' ", from));
-                String to = new SimpleDateFormat("yyyy-MM-dd").format(Date.from(((Date)condition.getToValue()).toInstant().atZone(ZoneId.systemDefault()).plusDays(1).toInstant()));
+                String to = new SimpleDateFormat("yyyy-MM-dd").format(
+                        Date.from(((Date) condition.getToValue()).toInstant().atZone(
+                                ZoneId.systemDefault()).plusDays(1).toInstant()));
                 query.append(String.format(" AND date <'%s' ", to));
             }
         }
-
-        query.append(" FROM ").append(getStorageName(clazz));
-        query.append(formatCondition(request.getCondition()));
+        query.append(formatOrder(request.getOrder()));
 
         try {
             QueryBuilder builder = QueryBuilder.create(config, this, objectMapper, query.toString());
