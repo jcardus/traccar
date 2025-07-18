@@ -251,7 +251,9 @@ public class SuntechProtocolDecoder extends BaseProtocolDecoder {
 
         position.setNetwork(network);
 
-        position.set(Position.KEY_BATTERY, Double.parseDouble(values[index++]));
+        double voltage = Double.parseDouble(values[index++]);
+        position.set(Position.KEY_BATTERY, voltage);
+        position.set(Position.KEY_BATTERY_LEVEL, getBatteryPercentage(voltage));
         position.set(Position.KEY_ARCHIVE, values[index++].equals("0") ? true : null);
         position.set(Position.KEY_INDEX, Integer.parseInt(values[index++]));
         position.set(Position.KEY_STATUS, Integer.parseInt(values[index++]));
