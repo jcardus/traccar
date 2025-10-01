@@ -3,6 +3,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
+import com.amazonaws.services.lambda.runtime.logging.LogLevel;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
@@ -54,7 +55,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         String query = Optional.ofNullable(event.getRawQueryString())
                 .filter(q -> !q.isEmpty()).map(q -> "?" + q).orElse("");
         String fullUrl = "http://localhost:8082" + path + query;
-        context.getLogger().log(fullUrl);
+        context.getLogger().log(fullUrl, LogLevel.INFO);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(fullUrl))
@@ -62,7 +63,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         if (event.getHeaders() != null) {
             Map<String, String> headers = event.getHeaders();
-            context.getLogger().log("Request headers: " + headers);
+            context.getLogger().log(headers.toString(), LogLevel.DEBUG);
             for (String name : List.of("accept", "cookie", "content-type", "authorization")) {
                 Optional.ofNullable(headers.get(name))
                         .ifPresent(value -> requestBuilder.header(name, value));
