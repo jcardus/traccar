@@ -55,7 +55,8 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         String query = Optional.ofNullable(event.getRawQueryString())
                 .filter(q -> !q.isEmpty()).map(q -> "?" + q).orElse("");
         String fullUrl = "http://localhost:8082" + path + query;
-        context.getLogger().log(fullUrl + '\n', LogLevel.INFO);
+
+        log(context, fullUrl);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(fullUrl))
@@ -87,6 +88,12 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
             e.printStackTrace();
             return errorResponse(e.getMessage());
         }
+    }
+
+    private static void log(Context context, String message) {
+        context.getLogger().log(
+                String.format("RequestId: %s %s\n", context.getAwsRequestId(),  message),
+                LogLevel.DEBUG);
     }
 
     private static HttpRequest.BodyPublisher bodyPublisher(APIGatewayV2HTTPEvent event) {
@@ -121,7 +128,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         final int uploadThreshold = 6 * 1024 * 1024; // 6MB
         if (compressedBody.length < uploadThreshold) {
-            context.getLogger().log(String.format("RequestId: %s returning %d bytes\n", context.getAwsRequestId(), compressedBody.length), LogLevel.DEBUG);
+            log(context, String.format("returning %d bytes", compressedBody.length));
             headers.put("Content-Encoding", "gzip");
             return APIGatewayV2HTTPResponse.builder()
                     .withStatusCode(response.statusCode())
