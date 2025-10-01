@@ -63,6 +63,15 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         if (event.getHeaders() != null) {
             Map<String, String> headers = event.getHeaders();
+            String tokens = System.getenv("BLACK_LISTED_TOKENS");
+            if (tokens != null && !tokens.isEmpty()) {
+                String[] tokenArray = tokens.split(",");
+                for (String token : tokenArray) {
+                    if (headers.containsKey("authorization") && headers.get("authorization").startsWith("Bearer " + token)) {
+                        return errorResponse("Too many requests", 429);
+                    }
+                }
+            }
             context.getLogger().log(headers.toString() + "\n", LogLevel.DEBUG);
             for (String name : List.of("accept", "cookie", "content-type", "authorization")) {
                 Optional.ofNullable(headers.get(name))
@@ -136,9 +145,12 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
     }
 
     private static APIGatewayV2HTTPResponse errorResponse(String message) {
-        System.out.println("returning 503");
+        return errorResponse(message, 503);
+    }
+    private static APIGatewayV2HTTPResponse errorResponse(String message, int statusCode) {
+        System.out.println("returning " + statusCode);
         return APIGatewayV2HTTPResponse.builder()
-                .withStatusCode(503)
+                .withStatusCode(statusCode)
                 .withBody(message)
                 .withIsBase64Encoded(false)
                 .build();
