@@ -55,7 +55,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         String query = Optional.ofNullable(event.getRawQueryString())
                 .filter(q -> !q.isEmpty()).map(q -> "?" + q).orElse("");
         String fullUrl = "http://localhost:8082" + path + query;
-        context.getLogger().log(fullUrl, LogLevel.INFO);
+        context.getLogger().log(fullUrl + '\n', LogLevel.INFO);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(fullUrl))
