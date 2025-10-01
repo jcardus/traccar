@@ -3,9 +3,7 @@ package org.traccar.storage;
 import com.amazon.athena.jdbc.AthenaDataSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
-import org.slf4j.LoggerFactory;
 import org.traccar.config.Config;
-import org.traccar.config.Keys;
 import org.traccar.storage.query.Columns;
 import org.traccar.storage.query.Condition;
 import org.traccar.storage.query.Request;
@@ -26,7 +24,6 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
     private final ObjectMapper objectMapper;
     private final Config config;
     private final Connection connection;
-    private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(AthenaStorage.class);
 
     @Inject
     public AthenaStorage(Config config, DataSource dataSource, ObjectMapper objectMapper) throws SQLException {
@@ -74,13 +71,10 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
                 query.append(String.format(" AND deviceid_shard='%d' ", (Long) condition.getValue() / 10));
             }
             if (c instanceof Condition.Between condition) {
-                long filterPast = config.getLong(Keys.FILTER_PAST) * 1000;
-                Date s3Date = new Date(System.currentTimeMillis() - filterPast);
-                LOGGER.info("Filtering past positions older than {}, filterPast {}", s3Date, filterPast);
-                Date fromDate = (Date) condition.getFromValue();
-                if (filterPast == 0 || fromDate.after(s3Date)) {
+                if (!Boolean.parseBoolean(System.getenv("ATHENA_ENABLED"))) {
                     return super.getObjectsStream(clazz, request);
                 }
+                Date fromDate = (Date) condition.getFromValue();
                 String from = new SimpleDateFormat("yyyy-MM-dd").format(fromDate);
                 query.append(String.format(" AND date >='%s' ", from));
                 String to = new SimpleDateFormat("yyyy-MM-dd").format(
