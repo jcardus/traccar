@@ -54,7 +54,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         String query = Optional.ofNullable(event.getRawQueryString())
                 .filter(q -> !q.isEmpty()).map(q -> "?" + q).orElse("");
         String fullUrl = "http://localhost:8082" + path + query;
-        System.out.print(fullUrl);
+        context.getLogger().log(fullUrl);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(fullUrl))
@@ -62,6 +62,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         if (event.getHeaders() != null) {
             Map<String, String> headers = event.getHeaders();
+            context.getLogger().log("Request headers: " + headers);
             for (String name : List.of("accept", "cookie", "content-type", "authorization")) {
                 Optional.ofNullable(headers.get(name))
                         .ifPresent(value -> requestBuilder.header(name, value));
@@ -110,7 +111,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         final int uploadThreshold = 6 * 1024 * 1024; // 6MB
         if (compressedBody.length < uploadThreshold) {
-            System.out.printf(" returning %d\n bytes", compressedBody.length);
+            System.out.printf(" returning %d bytes\n", compressedBody.length);
             headers.put("Content-Encoding", "gzip");
             return APIGatewayV2HTTPResponse.builder()
                     .withStatusCode(response.statusCode())
