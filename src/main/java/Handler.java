@@ -81,7 +81,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         try {
             return toLambdaResponse(HTTP_CLIENT.send(requestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream()));
+                    HttpResponse.BodyHandlers.ofInputStream()), context);
         } catch (Exception e) {
             //noinspection CallToPrintStackTrace
             e.printStackTrace();
@@ -105,7 +105,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         }
     }
 
-    private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response) throws IOException {
+    private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response, Context context) throws IOException {
         System.out.printf(" received %d\n", response.statusCode());
 
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
@@ -121,7 +121,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         final int uploadThreshold = 6 * 1024 * 1024; // 6MB
         if (compressedBody.length < uploadThreshold) {
-            System.out.printf(" returning %d bytes\n", compressedBody.length);
+            context.getLogger().log(String.format("RequestId: %s returning %d bytes\n", context.getAwsRequestId(), compressedBody.length), LogLevel.DEBUG);
             headers.put("Content-Encoding", "gzip");
             return APIGatewayV2HTTPResponse.builder()
                     .withStatusCode(response.statusCode())
