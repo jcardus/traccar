@@ -59,18 +59,33 @@ public class GeocodeJsonGeocoder extends JsonGeocoder {
             }
             if (properties.containsKey("city")) {
                 address.setSettlement(properties.getString("city"));
+            }            
+            if (properties.containsKey("settlement")) {
+                address.setSettlement(properties.getString("settlement"));
             }
             if (properties.containsKey("district")) {
                 address.setDistrict(properties.getString("district"));
             }
+            if (properties.containsKey("county")) {
+                address.setDistrict(properties.getString("county"));
+            }
             if (properties.containsKey("state")) {
                 address.setState(properties.getString("state"));
             }
+            if (properties.containsKey("region")) {
+                address.setState(properties.getString("region"));
+            }            
             if (properties.containsKey("countrycode")) {
                 address.setCountry(properties.getString("countrycode").toUpperCase());
             }
+            if (properties.containsKey("country_code")) {
+                address.setCountry(properties.getString("country_code").toUpperCase());
+            }
             if (properties.containsKey("postcode")) {
                 address.setPostcode(properties.getString("postcode"));
+            }
+            if (properties.containsKey("postalcode")) {
+                address.setPostcode(properties.getString("postalcode"));
             }
 
             return address;
