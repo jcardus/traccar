@@ -376,6 +376,17 @@ public class RuptelaProtocolDecoder extends BaseProtocolDecoder {
 
             return null;
 
+        } else if (type == 18) {
+
+            ByteBuf content = Unpooled.buffer();
+            content.writeByte(1);
+            ByteBuf response = RuptelaProtocolEncoder.encodeContent(0x73 - 100, content);
+            content.release();
+            if (channel != null) {
+                channel.writeAndFlush(new NetworkMessage(response, remoteAddress));
+            }
+
+            return null;
         } else {
 
             return decodeCommandResponse(deviceSession, type, buf);
