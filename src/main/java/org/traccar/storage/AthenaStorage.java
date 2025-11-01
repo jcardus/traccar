@@ -49,6 +49,8 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
         if (!Boolean.parseBoolean(System.getenv("ATHENA_ENABLED"))) {
             System.out.println("Athena is disabled");
             return super.getObjectsStream(clazz, request);
+        } else {
+            System.out.println("Athena is enabled");
         }
         if (!Objects.equals(clazz.getAnnotation(StorageName.class).value(), "tc_positions")) {
             return super.getObjectsStream(clazz, request);

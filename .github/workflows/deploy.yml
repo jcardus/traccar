@@ -25,6 +25,24 @@ jobs:
           java-version: 21
           cache: gradle
 
+      - name: Cache Gradle build
+        uses: actions/cache@v4
+        with:
+          path: |
+            traccar/.gradle
+            traccar/build
+          key: ${{ runner.os }}-gradle-build-${{ hashFiles('traccar/**/*.gradle*', 'traccar/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-build-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: traccar/traccar-web/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('traccar/traccar-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
       - name: Build traccar
         working-directory: traccar
         run: |
