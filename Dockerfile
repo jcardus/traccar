@@ -5,5 +5,6 @@ COPY traccar.xml ${LAMBDA_TASK_ROOT}/traccar.xml
 COPY traccar/target/tracker-server.jar ${LAMBDA_TASK_ROOT}/lib/
 COPY traccar/target/lib/ ${LAMBDA_TASK_ROOT}/lib/
 COPY traccar/traccar-web/build ${LAMBDA_TASK_ROOT}/traccar-web
+COPY traccar/templates ${LAMBDA_TASK_ROOT}
 
 CMD ["Handler::handleRequest"]
