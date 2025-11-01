@@ -47,7 +47,20 @@ jobs:
         working-directory: traccar
         run: |
           ./gradlew build --no-daemon -x checkstyleMain
-          cd traccar-web
+
+      - name: Cache web build output
+        id: cache-web-build
+        uses: actions/cache@v4
+        with:
+          path: traccar/traccar-web/build
+          key: ${{ runner.os }}-web-build-${{ hashFiles('traccar/traccar-web/src/**', 'traccar/traccar-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-web-build-
+
+      - name: Build web
+        if: steps.cache-web-build.outputs.cache-hit != 'true'
+        working-directory: traccar/traccar-web
+        run: |
           npm install
           npm run build
 
