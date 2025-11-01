@@ -114,6 +114,15 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
     private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response, Context context) throws IOException {
         System.out.printf(" received %d\n", response.statusCode());
+        if (response.statusCode() >= 400) {
+            String body = new String(response.body().readAllBytes());
+            log(context, String.format("returning %d %s", response.statusCode(), body));
+            return APIGatewayV2HTTPResponse.builder()
+                    .withStatusCode(response.statusCode())
+                    .withBody(body)
+                    .withIsBase64Encoded(false)
+                    .build();
+        }
 
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
         try (InputStream responseStream = response.body();
