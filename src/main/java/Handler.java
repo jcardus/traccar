@@ -3,6 +3,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
+import com.amazonaws.services.lambda.runtime.logging.LogLevel;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
@@ -54,7 +55,8 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         String query = Optional.ofNullable(event.getRawQueryString())
                 .filter(q -> !q.isEmpty()).map(q -> "?" + q).orElse("");
         String fullUrl = "http://localhost:8082" + path + query;
-        System.out.print(fullUrl);
+
+        log(context, fullUrl);
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(fullUrl))
@@ -62,6 +64,16 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         if (event.getHeaders() != null) {
             Map<String, String> headers = event.getHeaders();
+            String tokens = System.getenv("BLACK_LISTED_TOKENS");
+            if (tokens != null && !tokens.isEmpty()) {
+                String[] tokenArray = tokens.split(",");
+                for (String token : tokenArray) {
+                    if (headers.containsKey("authorization") && headers.get("authorization").startsWith("Bearer " + token)) {
+                        return errorResponse("Too many requests", 429);
+                    }
+                }
+            }
+            context.getLogger().log(headers.toString() + "\n", LogLevel.DEBUG);
             for (String name : List.of("accept", "cookie", "content-type", "authorization")) {
                 Optional.ofNullable(headers.get(name))
                         .ifPresent(value -> requestBuilder.header(name, value));
@@ -70,12 +82,18 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         try {
             return toLambdaResponse(HTTP_CLIENT.send(requestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofInputStream()));
+                    HttpResponse.BodyHandlers.ofInputStream()), context);
         } catch (Exception e) {
             //noinspection CallToPrintStackTrace
             e.printStackTrace();
             return errorResponse(e.getMessage());
         }
+    }
+
+    private static void log(Context context, String message) {
+        context.getLogger().log(
+                String.format("RequestId: %s %s\n", context.getAwsRequestId(),  message),
+                LogLevel.DEBUG);
     }
 
     private static HttpRequest.BodyPublisher bodyPublisher(APIGatewayV2HTTPEvent event) {
@@ -94,8 +112,17 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         }
     }
 
-    private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response) throws IOException {
+    private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response, Context context) throws IOException {
         System.out.printf(" received %d\n", response.statusCode());
+        if (response.statusCode() >= 400) {
+            String body = new String(response.body().readAllBytes());
+            log(context, String.format("returning %d %s", response.statusCode(), body));
+            return APIGatewayV2HTTPResponse.builder()
+                    .withStatusCode(response.statusCode())
+                    .withBody(body)
+                    .withIsBase64Encoded(false)
+                    .build();
+        }
 
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
         try (InputStream responseStream = response.body();
@@ -110,7 +137,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
         final int uploadThreshold = 6 * 1024 * 1024; // 6MB
         if (compressedBody.length < uploadThreshold) {
-            System.out.printf(" returning %d\n bytes", compressedBody.length);
+            log(context, String.format("returning %d bytes", compressedBody.length));
             headers.put("Content-Encoding", "gzip");
             return APIGatewayV2HTTPResponse.builder()
                     .withStatusCode(response.statusCode())
@@ -134,9 +161,12 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
     }
 
     private static APIGatewayV2HTTPResponse errorResponse(String message) {
-        System.out.println("returning 503");
+        return errorResponse(message, 503);
+    }
+    private static APIGatewayV2HTTPResponse errorResponse(String message, int statusCode) {
+        System.out.println("returning " + statusCode);
         return APIGatewayV2HTTPResponse.builder()
-                .withStatusCode(503)
+                .withStatusCode(statusCode)
                 .withBody(message)
                 .withIsBase64Encoded(false)
                 .build();
