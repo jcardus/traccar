@@ -46,6 +46,9 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
 
     @Override
     public <T> Stream<T> getObjectsStream(Class<T> clazz, Request request) throws StorageException {
+        if (!Boolean.parseBoolean(System.getenv("ATHENA_ENABLED"))) {
+            return super.getObjectsStream(clazz, request);
+        }
         if (!Objects.equals(clazz.getAnnotation(StorageName.class).value(), "tc_positions")) {
             return super.getObjectsStream(clazz, request);
         }
@@ -71,9 +74,6 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
                 query.append(String.format(" AND deviceid_shard='%d' ", (Long) condition.getValue() / 10));
             }
             if (c instanceof Condition.Between condition) {
-                if (!Boolean.parseBoolean(System.getenv("ATHENA_ENABLED"))) {
-                    return super.getObjectsStream(clazz, request);
-                }
                 Date fromDate = (Date) condition.getFromValue();
                 String from = new SimpleDateFormat("yyyy-MM-dd").format(fromDate);
                 query.append(String.format(" AND date >='%s' ", from));

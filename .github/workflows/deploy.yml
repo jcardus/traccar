@@ -1,0 +1,90 @@
+name: Deploy
+on:
+  workflow_dispatch:
+  push:
+    branches: [ reports ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      IMAGE_URI: ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/${{vars.FUNCTION_NAME}}:latest
+    steps:
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Cache Gradle build
+        uses: actions/cache@v4
+        with:
+          path: |
+            .gradle
+            build
+          key: ${{ runner.os }}-gradle-build-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-build-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: traccar-web/node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('traccar-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Build traccar
+        run: |
+          ./gradlew build --no-daemon -x checkstyleMain
+
+      - name: Cache web build output
+        id: cache-web-build
+        uses: actions/cache@v4
+        with:
+          path: traccar-web/build
+          key: ${{ runner.os }}-web-build-${{ hashFiles('traccar-web/src/**', 'traccar-web/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-web-build-
+
+      - name: Build web
+        if: steps.cache-web-build.outputs.cache-hit != 'true'
+        working-directory: traccar-web
+        run: |
+          npm install
+          npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - run: aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_URI }}
+          provenance: false   # ← disables BuildKit attestation metadata (required for Lambda)
+          sbom: false         # ← disables build metadata that may break Lambda
+
+      - run: >
+          aws lambda update-function-code
+          --function-name ${{ vars.FUNCTION_NAME }}
+          --image-uri ${{ env.IMAGE_URI }}
+          --no-cli-pager
+      - run: >
+          aws lambda wait function-updated
+          --function-name ${{ vars.FUNCTION_NAME }}
+
