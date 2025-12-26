@@ -102,7 +102,7 @@ public class DatabaseStorage extends Storage {
             builder.setObject(entity, columns);
             return builder.executeUpdate();
         } catch (SQLException e) {
-            throw new StorageException(e);
+            throw new StorageException(e + " - " + query);
         }
     }
 
