@@ -2,9 +2,9 @@ name: Build Project
 
 on:
   push:
-    branches: [ master ]
+    branches: [ entrack ]
   pull_request:
-    branches: [ master ]
+    branches: [ entrack ]
 
 jobs:
   build:
