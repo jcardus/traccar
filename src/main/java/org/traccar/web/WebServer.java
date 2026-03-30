@@ -138,20 +138,6 @@ public class WebServer implements LifecycleObject {
         baseHolder.setInitParameter("cacheControl", cache);
         servletHandler.addServlet(baseHolder, "/");
 
-        Path override = Paths.get(config.getString(Keys.WEB_OVERRIDE));
-        Path overrideReal = override.toRealPath(LinkOption.NOFOLLOW_LINKS);
-
-        ServletHolder overrideHolder = new ServletHolder(ResourceServlet.class);
-        overrideHolder.setInitParameter("baseResource", overrideReal.toString());
-        overrideHolder.setInitParameter("pathInfoOnly", "true");
-        overrideHolder.setInitParameter("dirAllowed", "false");
-        overrideHolder.setInitParameter("cacheControl", cache);
-        servletHandler.addServlet(overrideHolder, "/override/*");
-
-        FilterHolder filterHolder = new FilterHolder(new OverrideFileFilter());
-        filterHolder.setInitParameter("overridePath", overrideReal.toString());
-        servletHandler.addFilter(filterHolder, "/*", EnumSet.of(DispatcherType.REQUEST));
-
         if (config.getBoolean(Keys.WEB_DEBUG)) {
             servletHandler.setWelcomeFiles(new String[] {"debug.html", "index.html"});
         } else {
