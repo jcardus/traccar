@@ -68,8 +68,8 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
             if (tokens != null && !tokens.isEmpty()) {
                 String[] tokenArray = tokens.split(",");
                 for (String token : tokenArray) {
-                    if (headers.containsKey("authorization") && 
-                        headers.get("authorization").startsWith("Bearer " + token)) {
+                    if (headers.containsKey("authorization")
+                        && headers.get("authorization").startsWith("Bearer " + token)) {
                         return errorResponse("Too many requests", 429);
                     }
                 }
@@ -113,7 +113,8 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         }
     }
 
-    private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response, Context context) throws IOException {
+    private static APIGatewayV2HTTPResponse toLambdaResponse(HttpResponse<InputStream> response,
+        Context context) throws IOException {
         System.out.printf(" received %d\n", response.statusCode());
         if (response.statusCode() >= 400) {
             String body = new String(response.body().readAllBytes());
