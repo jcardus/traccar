@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM 'http://java.sun.com/dtd/properties.dtd'>
+<properties>
+    <entry key='database.changelog'/>
+    <entry key='database.driver'>org.postgresql.Driver</entry>
+    <entry key='geocoder.onRequest'>false</entry>
+    <entry key='logger.console'>true</entry>
+    <entry key='logger.level'>config</entry>
+    <entry key='logger.queries'>true</entry>
+    <entry key="protocols.enable"/>
+    <entry key='web.address'>127.0.0.1</entry>
+    <entry key='web.path'>./traccar-web</entry>
+    <entry key='web.persistSession'>true</entry>
+    <entry key='report.fastThreshold'>86400000</entry>
+</properties>

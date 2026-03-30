@@ -281,7 +281,7 @@ public final class QueryBuilder {
                 }
                 if (column) {
                     Method method = entry.getValue().method();
-                    addProcessors(processors, method.getParameterTypes()[0], method, name);
+                    addProcessors(processors, method.getParameterTypes()[0], method, name.toLowerCase());
                 }
             }
 
