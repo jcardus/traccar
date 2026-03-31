@@ -207,7 +207,7 @@ public class PortConfigSuffix extends ConfigSuffix<Integer> {
         PORTS.put("nyitech", 5182);
         PORTS.put("neos", 5183);
         PORTS.put("satsol", 5184);
-        PORTS.put("globalstar", 5185);
+        PORTS.put("globalstar", 8080);
         PORTS.put("sanul", 5186);
         PORTS.put("minifinder2", 5187);
         PORTS.put("radar", 5188);
