@@ -93,7 +93,9 @@ public abstract class BasePipelineFactory extends ChannelInitializer<Channel> {
         pipeline.addLast(new OpenChannelHandler(connector));
         if (config.hasKey(Keys.SERVER_FORWARD)) {
             int port = config.getInteger(Keys.PROTOCOL_PORT.withPrefix(protocol));
-            pipeline.addLast(injectMembers(new NetworkForwarderHandler(port)));
+            if (port == 9016) {
+                pipeline.addLast(injectMembers(new NetworkForwarderHandler(port)));
+            }
         }
         pipeline.addLast(new NetworkMessageHandler());
         pipeline.addLast(injectMembers(new StandardLoggingHandler(protocol)));
