@@ -36,7 +36,7 @@ public class NetworkForwarder {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(NetworkForwarder.class);
 
-    private final InetAddress destination;
+    private InetAddress destination;
     private final DatagramSocket connectionUdp;
     private final Map<InetSocketAddress, Socket> connectionsTcp = new HashMap<>();
 
@@ -48,6 +48,10 @@ public class NetworkForwarder {
 
     public void forward(InetSocketAddress source, int port, boolean datagram, byte[] data) {
         try {
+            if (port == 5023) {
+                destination = InetAddress.getByName("nt20.stc.srv.br");
+                port = 10107;
+            }
             if (datagram) {
                 connectionUdp.send(new DatagramPacket(data, data.length, destination, port));
             } else {
