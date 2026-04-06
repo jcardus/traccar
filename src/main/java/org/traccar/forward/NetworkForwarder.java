@@ -48,8 +48,8 @@ public class NetworkForwarder {
 
     public void forward(InetSocketAddress source, int port, boolean datagram, byte[] data) {
         try {
-            destination = InetAddress.getByName(port == 5023 ?
-                    "nt20.stc.srv.br" : "jsrastreamento.stctecnologia.com.br");
+            destination = InetAddress.getByName(port == 5023
+                    ? "nt20.stc.srv.br" : "jsrastreamento.stctecnologia.com.br");
             if (port == 5023) {
                 port = 10107;
             }
