@@ -153,9 +153,7 @@ public class GlobalstarProtocolDecoder extends BaseHttpProtocolDecoder {
                 position.set(Position.PREFIX_IN + 1, !BitUtil.check(flags, 1));
                 position.set(Position.PREFIX_IN + 2, !BitUtil.check(flags, 2));
                 position.set(Position.KEY_CHARGE, !BitUtil.check(flags, 3));
-                if (BitUtil.check(flags, 4)) {
-                    position.addAlarm(Position.ALARM_VIBRATION);
-                }
+                position.set(Position.KEY_IGNITION, BitUtil.check(flags, 4));
                 position.setCourse(BitUtil.from(flags, 5) * 45);
             } else {
                 type = BitUtil.to(flags, 2);
