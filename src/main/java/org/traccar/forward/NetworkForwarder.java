@@ -28,7 +28,9 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Singleton
@@ -38,7 +40,7 @@ public class NetworkForwarder {
 
     private InetAddress destination;
     private final DatagramSocket connectionUdp;
-    private final Map<InetSocketAddress, Socket> connectionsTcp = new HashMap<>();
+    private final Map<InetSocketAddress, List<Socket>> connectionsTcp = new HashMap<>();
 
     @Inject
     public NetworkForwarder(Config config) throws IOException {
@@ -47,19 +49,33 @@ public class NetworkForwarder {
     }
 
     public void forward(InetSocketAddress source, int port, boolean datagram, byte[] data) {
+        if (port == 5023) {
+            sendTo(source, "nt20.stc.srv.br", 10107, datagram, data);
+            sendTo(source, "serv8.rastrosystem.com.br", 5023, datagram, data);
+        } else {
+            sendTo(source, "jsrastreamento.stctecnologia.com.br", port, datagram, data);
+        }
+    }
+
+    private void sendTo(InetSocketAddress source, String host, int port, boolean datagram, byte[] data) {
         try {
-            destination = InetAddress.getByName(port == 5023
-                    ? "nt20.stc.srv.br" : "jsrastreamento.stctecnologia.com.br");
-            if (port == 5023) {
-                port = 10107;
-            }
+            InetAddress target = InetAddress.getByName(host);
             if (datagram) {
-                connectionUdp.send(new DatagramPacket(data, data.length, destination, port));
+                connectionUdp.send(new DatagramPacket(data, data.length, target, port));
             } else {
-                Socket connectionTcp = connectionsTcp.get(source);
-                if (connectionTcp == null || connectionTcp.isClosed()) {
-                    connectionTcp = new Socket(destination, port);
-                    connectionsTcp.put(source, connectionTcp);
+                List<Socket> sockets = connectionsTcp.computeIfAbsent(source, k -> new ArrayList<>());
+                Socket connectionTcp = null;
+                for (Socket s : sockets) {
+                    if (!s.isClosed()
+                            && s.getInetAddress().equals(target)
+                            && s.getPort() == port) {
+                        connectionTcp = s;
+                        break;
+                    }
+                }
+                if (connectionTcp == null) {
+                    connectionTcp = new Socket(target, port);
+                    sockets.add(connectionTcp);
                 }
                 connectionTcp.getOutputStream().write(data);
             }
@@ -69,12 +85,14 @@ public class NetworkForwarder {
     }
 
     public void disconnect(InetSocketAddress source) {
-        Socket connectionTcp = connectionsTcp.remove(source);
-        if (connectionTcp != null) {
-            try {
-                connectionTcp.close();
-            } catch (IOException e) {
-                LOGGER.warn("Connection close error", e);
+        List<Socket> sockets = connectionsTcp.remove(source);
+        if (sockets != null) {
+            for (Socket connectionTcp : sockets) {
+                try {
+                    connectionTcp.close();
+                } catch (IOException e) {
+                    LOGGER.warn("Connection close error", e);
+                }
             }
         }
     }
