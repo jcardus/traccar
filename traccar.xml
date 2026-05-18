@@ -12,4 +12,8 @@
     <entry key='web.path'>./traccar-web</entry>
     <entry key='web.persistSession'>true</entry>
     <entry key='report.fastThreshold'>86400000</entry>
+    <entry key='report.trip.minimalTripDuration'>59</entry>
+    <entry key='report.trip.minimalTripDistance'>15</entry>
+    <entry key='report.trip.minimalParkingDuration'>150</entry>
+    <entry key='report.trip.useIgnition'>true</entry>
 </properties>
