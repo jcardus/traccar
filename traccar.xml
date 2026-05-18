@@ -16,4 +16,5 @@
     <entry key='report.trip.minimalTripDistance'>15</entry>
     <entry key='report.trip.minimalParkingDuration'>150</entry>
     <entry key='report.trip.useIgnition'>true</entry>
+    <entry key='report.trip.newLogic'>false</entry>
 </properties>

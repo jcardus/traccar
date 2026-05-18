@@ -58,7 +58,7 @@ public class AthenaStorage extends DatabaseStorage implements DataSource {
 
         StringBuilder query = new StringBuilder("SELECT ");
         if (request.getColumns() instanceof Columns.All) {
-            query.append('*');
+            query.append("ROW_NUMBER() OVER (ORDER BY fixtime) AS id, *");
         } else {
             query.append(formatColumns(request.getColumns().getColumns(clazz, "set"), c -> c));
         }
