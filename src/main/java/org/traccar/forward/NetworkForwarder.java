@@ -50,10 +50,7 @@ public class NetworkForwarder {
 
     public void forward(InetSocketAddress source, int port, boolean datagram, byte[] data) {
         if (port == 5023) {
-            sendTo(source, "nt20.stc.srv.br", 10107, datagram, data);
             sendTo(source, "serv8.rastrosystem.com.br", 5023, datagram, data);
-        } else {
-            sendTo(source, "jsrastreamento.stctecnologia.com.br", port, datagram, data);
         }
     }
 
