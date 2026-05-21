@@ -117,7 +117,7 @@ public final class Main {
             injector = Guice.createInjector(new MainModule(configFile), new DatabaseModule(), new WebModule());
             logSystemInfo();
             LOGGER.info("Version: {}", Main.class.getPackage().getImplementationVersion());
-            LOGGER.info("Starting server...");
+            LOGGER.info("Starting server jsrastreamento");
 
             var services = new ArrayList<LifecycleObject>();
             for (var clazz : List.of(
