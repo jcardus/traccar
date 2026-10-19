@@ -133,6 +133,7 @@ public class UproProtocolDecoder extends BaseProtocolDecoder {
                     for (int i = 0; i < 5; i++) {
                         s[i] = status.charAt(i) - '0';
                     }
+                    position.set(Position.KEY_BLOCKED, BitUtil.check(s[0], 1));
                     position.set(Position.KEY_IGNITION, BitUtil.check(s[1], 0));
 
                     int[] a = new int[5];

@@ -12,6 +12,14 @@ public class UproProtocolDecoderTest extends ProtocolTest {
         var decoder = inject(new UproProtocolDecoder(null));
 
         verifyAttribute(decoder, buffer(
+                "*HQ20113800138000,YBB&A0732142233550011405829060520190314&B2100000000&C00001234&R3109#"),
+                Position.KEY_BLOCKED, true);
+
+        verifyAttribute(decoder, buffer(
+                "*HQ20113800138000,YBB&A0732142233550011405829060520190314&B0100000000&C00001234&R3109#"),
+                Position.KEY_BLOCKED, false);
+
+        verifyAttribute(decoder, buffer(
                 "*HQ200862407688000021,BA&A0925002234596911356066460008120225&B0100000000&C0000<776&F0000&R2515&N04&K00300&T82&X(10)(J0000)(k89882280666128238130)(PICAUTHORIZE,0,FE6B564F)(PICAUTHORIZE,1,0E3FF94F)(PBLE,E4:65:60:45:3B:A5)&G000150&J000271&l2000#"),
                 Position.KEY_ICCID, "89882280666128238130");
 
