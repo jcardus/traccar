@@ -21,6 +21,7 @@ import org.traccar.CharacterDelimiterFrameDecoder;
 import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
 import org.traccar.config.Config;
+import org.traccar.model.Command;
 
 import jakarta.inject.Inject;
 
@@ -28,11 +29,16 @@ public class UproProtocol extends BaseProtocol {
 
     @Inject
     public UproProtocol(Config config) {
+        setSupportedDataCommands(
+                Command.TYPE_CUSTOM,
+                Command.TYPE_ENGINE_STOP,
+                Command.TYPE_ENGINE_RESUME);
         addServer(new TrackerServer(config, getName(), false) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline, Config config) {
                 pipeline.addLast(new CharacterDelimiterFrameDecoder(1024, '#'));
                 pipeline.addLast(new StringEncoder());
+                pipeline.addLast(new UproProtocolEncoder(UproProtocol.this));
                 pipeline.addLast(new UproProtocolDecoder(UproProtocol.this));
             }
         });
