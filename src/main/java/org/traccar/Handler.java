@@ -25,8 +25,10 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.zip.GZIPOutputStream;
 
@@ -38,6 +40,18 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
 
     private static final AmazonS3 S3_CLIENT = AmazonS3ClientBuilder.standard().build();
     private static final String BUCKET_NAME = System.getenv("S3_BUCKET_NAME");
+    // Jetty streams a large body with these headers. Copying them onto the
+    // Lambda response makes nginx wait for a chunked body that is never sent,
+    // so the client never follows the S3 redirect.
+    private static final Set<String> HOP_BY_HOP = Set.of(
+            "connection",
+            "keep-alive",
+            "proxy-connection",
+            "transfer-encoding",
+            "te",
+            "trailer",
+            "upgrade",
+            "content-length");
     private static final long URL_EXPIRATION_TIME = 3600000; // 1 hour in milliseconds
 
     static {
@@ -136,6 +150,7 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
         Map<String, String> headers = new HashMap<>();
         HttpHeaders rawHeaders = response.headers();
         rawHeaders.map().forEach((k, vList) -> headers.put(k, String.join(", ", vList)));
+        stripHopByHop(headers);
 
         final int uploadThreshold = 6 * 1024 * 1024; // 6MB
         if (compressedBody.length < uploadThreshold) {
@@ -160,6 +175,10 @@ public class Handler implements RequestHandler<APIGatewayV2HTTPEvent, APIGateway
                     .withHeaders(headers)
                     .build();
         }
+    }
+
+    static void stripHopByHop(Map<String, String> headers) {
+        headers.keySet().removeIf(name -> name != null && HOP_BY_HOP.contains(name.toLowerCase(Locale.ROOT)));
     }
 
     private static APIGatewayV2HTTPResponse errorResponse(String message) {
