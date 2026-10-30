@@ -37,10 +37,15 @@ public final class McpResultLink {
 
     private static final String SCHEME = "traccar://";
     private static final int DEVICE_LIMIT = 8;
+    public static final String INSTRUCTIONS =
+            "A ranged positions call or a route report returns a summary and a traccar:// resource link. "
+                    + "The positions are the JSON array from resources/read on that exact URI. "
+                    + "Answer from that JSON.";
     private static final String POSITION_LIST =
-            "a summary of the position list and a resource link for the client. "
+            "a summary and a traccar:// resource link. "
                     + "The summary has the count, devices, time span, start and end, "
-                    + "and the included fields and attributes.";
+                    + "and the included fields and attributes. "
+                    + "Read the positions with resources/read on that URI.";
     private static final Set<String> POSITION_KEYS = Set.of("deviceId", "from", "to", "id");
     private static final Set<String> REPORT_KEYS = Set.of("deviceId", "groupId", "from", "to");
 
@@ -135,7 +140,8 @@ public final class McpResultLink {
         } else {
             text.append(contents(positions, arguments));
         }
-        text.append(". The client can read the positions at ").append(uri(path, arguments)).append('.');
+        text.append(". This is a summary. Read the positions with resources/read at ")
+                .append(uri(path, arguments)).append('.');
         return text.toString();
     }
 

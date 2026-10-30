@@ -80,12 +80,12 @@ public class McpResultLinkTest {
                         + "Start 38.50000, -9.25000. End 38.75000, -9.50000 (Lisbon). "
                         + "Fields: address, deviceId, fixTime, latitude, longitude, speed, valid. "
                         + "Attributes: ignition, totalDistance. "
-                        + "The client can read the positions at "
+                        + "This is a summary. Read the positions with resources/read at "
                         + McpResultLink.uri(McpResultLink.POSITIONS, arguments) + ".",
                 summary);
         assertEquals(
                 "0 positions for device 7 from 2026-10-29T00:00:00Z to 2026-10-29T23:00:00Z. "
-                        + "The client can read the positions at "
+                        + "This is a summary. Read the positions with resources/read at "
                         + McpResultLink.uri(McpResultLink.POSITIONS, arguments) + ".",
                 McpResultLink.summary(objectMapper, McpResultLink.POSITIONS, arguments, "[]"));
     }
@@ -107,7 +107,7 @@ public class McpResultLinkTest {
                         + "Start 38.50000, -9.25000. End 38.75000, -9.50000. "
                         + "Device 8: 1 position at 2026-10-29T10:00:00Z. At 41.00000, -8.00000. "
                         + "Fields: deviceId, fixTime, latitude, longitude. "
-                        + "The client can read the positions at "
+                        + "This is a summary. Read the positions with resources/read at "
                         + McpResultLink.uri(McpResultLink.ROUTE, arguments) + ".",
                 summary);
     }

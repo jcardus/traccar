@@ -67,6 +67,7 @@ public class McpServerHolder implements AutoCloseable {
 
         server = McpServer.async(transport)
                 .serverInfo("traccar-mcp", "1.0.0")
+                .instructions(McpResultLink.INSTRUCTIONS)
                 .capabilities(capabilities)
                 .tools(toolRegistry.getTools().stream().map(this::createApiTool).toList())
                 .resourceTemplates(resultTemplate())
@@ -136,7 +137,8 @@ public class McpServerHolder implements AutoCloseable {
     private McpServerFeatures.AsyncResourceTemplateSpecification resultTemplate() {
         var template = McpSchema.ResourceTemplate.builder("traccar://{kind}?{query}", "traccar-result")
                 .title("Traccar positions")
-                .description("Position list from ranged positions or the route report.")
+                .description("JSON array of positions for a traccar:// URI. "
+                        + "Call resources/read with that URI. The tool result is only a summary.")
                 .mimeType("application/json")
                 .build();
         return new McpServerFeatures.AsyncResourceTemplateSpecification(template, this::readResult);
