@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.common.McpTransportContext;
 import io.modelcontextprotocol.json.jackson2.JacksonMcpJsonMapper;
 import io.modelcontextprotocol.server.McpAsyncServer;
+import io.modelcontextprotocol.server.McpAsyncServerExchange;
 import io.modelcontextprotocol.server.McpServer;
 import io.modelcontextprotocol.server.McpServerFeatures;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
@@ -30,6 +31,7 @@ import jakarta.inject.Singleton;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 
 @Singleton
 public class McpServerHolder implements AutoCloseable {
@@ -39,6 +41,7 @@ public class McpServerHolder implements AutoCloseable {
     private static final McpSchema.ToolAnnotations READ_ONLY_ANNOTATIONS = new McpSchema.ToolAnnotations(
             null, true, false, true, false, null);
 
+    private final ObjectMapper objectMapper;
     private final McpApiInvoker apiInvoker;
 
     private final HttpServletStreamableServerTransportProvider transport;
@@ -47,6 +50,7 @@ public class McpServerHolder implements AutoCloseable {
     @Inject
     public McpServerHolder(ObjectMapper objectMapper, McpToolRegistry toolRegistry, McpApiInvoker apiInvoker) {
 
+        this.objectMapper = objectMapper;
         this.apiInvoker = apiInvoker;
 
         transport = HttpServletStreamableServerTransportProvider.builder()
@@ -65,6 +69,7 @@ public class McpServerHolder implements AutoCloseable {
                 .serverInfo("traccar-mcp", "1.0.0")
                 .capabilities(capabilities)
                 .tools(toolRegistry.getTools().stream().map(this::createApiTool).toList())
+                .resourceTemplates(resultTemplate())
                 .build();
     }
 
@@ -86,10 +91,14 @@ public class McpServerHolder implements AutoCloseable {
 
     private McpServerFeatures.AsyncToolSpecification createApiTool(McpToolRegistry.McpApiTool tool) {
 
-        var toolSchema = McpSchema.Tool.builder(tool.name(), tool.inputSchema())
+        var toolSchemaBuilder = McpSchema.Tool.builder(tool.name(), tool.inputSchema())
                 .title(tool.title())
-                .annotations(READ_ONLY_ANNOTATIONS)
-                .build();
+                .annotations(READ_ONLY_ANNOTATIONS);
+        String description = McpResultLink.description(tool.path());
+        if (description != null) {
+            toolSchemaBuilder.description(description);
+        }
+        var toolSchema = toolSchemaBuilder.build();
 
         return McpServerFeatures.AsyncToolSpecification.builder()
                 .tool(toolSchema)
@@ -98,7 +107,22 @@ public class McpServerHolder implements AutoCloseable {
                         String authorization =
                                 (String) context.transportContext().get(McpAuthFilter.ATTRIBUTE_AUTHORIZATION);
                         String body = apiInvoker.get(tool.path(), request.arguments(), authorization);
-                        return Mono.just(McpSchema.CallToolResult.builder().addTextContent(body).build());
+                        if (!McpResultLink.returnsLink(tool.path(), request.arguments())) {
+                            return Mono.just(McpSchema.CallToolResult.builder().addTextContent(body).build());
+                        }
+                        String uri = McpResultLink.uri(tool.path(), request.arguments());
+                        String summary = McpResultLink.summary(
+                                objectMapper, tool.path(), request.arguments(), body);
+                        var link = McpSchema.ResourceLink.builder()
+                                .uri(uri)
+                                .name(McpResultLink.name(tool.path()))
+                                .mimeType("application/json")
+                                .description(summary)
+                                .build();
+                        return Mono.just(McpSchema.CallToolResult.builder()
+                                .addTextContent(summary)
+                                .addContent(link)
+                                .build());
                     } catch (RuntimeException e) {
                         return Mono.just(McpSchema.CallToolResult.builder()
                                 .addTextContent(e.getMessage())
@@ -107,6 +131,31 @@ public class McpServerHolder implements AutoCloseable {
                     }
                 })
                 .build();
+    }
+
+    private McpServerFeatures.AsyncResourceTemplateSpecification resultTemplate() {
+        var template = McpSchema.ResourceTemplate.builder("traccar://{kind}?{query}", "traccar-result")
+                .title("Traccar positions")
+                .description("Position list from ranged positions or the route report.")
+                .mimeType("application/json")
+                .build();
+        return new McpServerFeatures.AsyncResourceTemplateSpecification(template, this::readResult);
+    }
+
+    private Mono<McpSchema.ReadResourceResult> readResult(
+            McpAsyncServerExchange exchange, McpSchema.ReadResourceRequest request) {
+        try {
+            McpResultLink.Target target = McpResultLink.parse(request.uri());
+            String authorization =
+                    (String) exchange.transportContext().get(McpAuthFilter.ATTRIBUTE_AUTHORIZATION);
+            String body = apiInvoker.get(target.path(), target.arguments(), authorization);
+            var contents = McpSchema.TextResourceContents.builder(request.uri(), body)
+                    .mimeType("application/json")
+                    .build();
+            return Mono.just(McpSchema.ReadResourceResult.builder(List.of(contents)).build());
+        } catch (RuntimeException e) {
+            return Mono.error(e);
+        }
     }
 
     public HttpServlet getServlet() {
