@@ -30,7 +30,7 @@ import java.util.Set;
 
 public final class McpMapPayload {
 
-    public static final String RESOURCE_URI = "ui://traccar/map-v2.html";
+    public static final String RESOURCE_URI = "ui://traccar/map.html";
 
     private static final int MAX_INLINE_CHARS = 12_000;
     private static final double KNOTS_TO_KMH = 1.852;
