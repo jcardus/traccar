@@ -1,0 +1,122 @@
+<!doctype html>
+<!--
+  Based on show-map-view.ts from maplibre-mcp.
+  Copyright (c) 2026 Birk Skyum
+  https://github.com/birkskyum/maplibre-mcp
+  MIT License. See that repository for the full notice.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.12.0/dist/maplibre-gl.css">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.12.0/dist/maplibre-gl.mjs">
+<style>html, body { margin: 0; } #map { width: 100%; height: 480px; }</style>
+</head>
+<body>
+<div id="map"></div>
+<script type="module">
+import { App } from "https://cdn.jsdelivr.net/npm/@modelcontextprotocol/ext-apps@2.0.4/dist/src/app-with-deps.js";
+
+const INLINE_HEIGHT = "480px";
+const LABEL_TYPES = new Set(["symbol", "circle"]);
+
+const app = new App({ name: "Traccar map", version: "1.0.0" });
+let map;
+
+app.ontoolresult = (result) => {
+    if (result.structuredContent) showMap(result.structuredContent).catch(reportError);
+};
+app.onhostcontextchanged = applyDisplayMode;
+await app.connect();
+applyDisplayMode();
+
+async function showMap(payload) {
+    const url = document.querySelector('link[rel="modulepreload"]')?.href;
+    if (!url) throw new Error("The page does not link MapLibre GL JS.");
+    const maplibregl = await import(url);
+    // Hosts allow blob workers and block external worker origins. Fetch the
+    // worker through connect-src and register a local Blob URL.
+    const base = url.slice(0, url.lastIndexOf("/") + 1);
+    const workerResponse = await fetch(`${base}maplibre-gl-worker.mjs`);
+    if (!workerResponse.ok) throw new Error(`Could not load MapLibre worker (${workerResponse.status}).`);
+    const workerSource = await workerResponse.text();
+    const sharedUrl = `${base}maplibre-gl-shared.mjs`;
+    const workerBlob = new Blob([
+        workerSource.replaceAll('from"./maplibre-gl-shared.mjs"', `from"${sharedUrl}"`),
+    ], { type: "text/javascript" });
+    maplibregl.setWorkerUrl(URL.createObjectURL(workerBlob));
+
+    map?.remove();
+    const instance = new maplibregl.Map({
+        container: "map",
+        style: payload.style,
+        ...payload.camera,
+        fitBoundsOptions: { padding: 48, maxZoom: 15 },
+    });
+    map = instance;
+    instance.addControl(new maplibregl.NavigationControl());
+    if (app.getHostContext()?.availableDisplayModes?.includes("fullscreen")) {
+        instance.addControl(fullscreenControl());
+    }
+    instance.on("error", (event) => reportError(event.error));
+    instance.once("load", () => {
+        const labels = topLabelLayer(instance.getStyle().layers);
+        for (const [id, source] of Object.entries(payload.sources)) instance.addSource(id, source);
+        for (const layer of payload.layers) {
+            instance.addLayer(layer, LABEL_TYPES.has(layer.type) ? undefined : labels);
+        }
+    });
+    for (const { position, label, color } of payload.markers) {
+        const marker = new maplibregl.Marker({ color }).setLngLat(position).addTo(instance);
+        if (label) marker.setPopup(new maplibregl.Popup({ offset: 24 }).setText(label));
+    }
+}
+
+function topLabelLayer(layers) {
+    return layers[layers.findLastIndex((layer) => layer.type !== "symbol") + 1]?.id;
+}
+
+function fullscreenControl() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.title = "Toggle fullscreen";
+    button.className = "maplibregl-ctrl-fullscreen";
+    button.innerHTML = '<span class="maplibregl-ctrl-icon" aria-hidden="true"></span>';
+    button.addEventListener("click", () => {
+        const mode = app.getHostContext()?.displayMode === "fullscreen" ? "inline" : "fullscreen";
+        app.requestDisplayMode({ mode }).catch(reportError);
+    });
+    const container = document.createElement("div");
+    container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+    container.append(button);
+    return { onAdd: () => container, onRemove: () => container.remove() };
+}
+
+function applyDisplayMode() {
+    const fullscreen = app.getHostContext()?.displayMode === "fullscreen";
+    document.querySelector("#map")?.style.setProperty("height", fullscreen ? "100vh" : INLINE_HEIGHT);
+    document.querySelector(".maplibregl-ctrl-fullscreen, .maplibregl-ctrl-shrink")
+        ?.setAttribute("class", fullscreen ? "maplibregl-ctrl-shrink" : "maplibregl-ctrl-fullscreen");
+    map?.resize();
+}
+
+function reportError(error) {
+    const message = error instanceof Error ? error.message : String(error);
+    app.sendLog({ level: "error", data: message }).catch(() => undefined);
+    errorBox().textContent = message;
+}
+
+function errorBox() {
+    const existing = document.querySelector("#error");
+    if (existing) return existing;
+    const box = document.createElement("div");
+    box.id = "error";
+    box.style.cssText = "position:absolute;left:8px;bottom:8px;max-width:70%;padding:4px 8px;background:#fff;color:#b00;font:12px sans-serif;border-radius:4px;";
+    document.body.style.position = "relative";
+    document.body.append(box);
+    return box;
+}
+</script>
+</body>
+</html>
