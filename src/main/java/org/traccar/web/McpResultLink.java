@@ -1,5 +1,5 @@
 /*
- * Copyright 2026 Anton Tananaev (anton@traccar.org)
+ * Copyright 2026 Joaquim Cardeira (joaquim_cardeira@hotmail.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
