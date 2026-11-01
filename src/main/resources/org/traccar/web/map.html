@@ -28,6 +28,10 @@ app.ontoolresult = (result) => {
     if (result.structuredContent) showMap(result.structuredContent).catch(reportError);
 };
 app.onhostcontextchanged = applyDisplayMode;
+document.addEventListener("securitypolicyviolation", (event) => {
+    if (event.blockedURI === "eval") return;
+    reportError(`Blocked by the host (${event.effectiveDirective}): ${event.blockedURI}`);
+});
 await app.connect();
 applyDisplayMode();
 
@@ -35,16 +39,10 @@ async function showMap(payload) {
     const url = document.querySelector('link[rel="modulepreload"]')?.href;
     if (!url) throw new Error("The page does not link MapLibre GL JS.");
     const maplibregl = await import(url);
-    // Hosts allow blob workers and block external worker origins. Fetch the
-    // worker through connect-src and register a local Blob URL.
+    // Hosts allow blob workers and block external worker origins. Register a
+    // local Blob URL that imports the worker module through script-src.
     const base = url.slice(0, url.lastIndexOf("/") + 1);
-    const workerResponse = await fetch(`${base}maplibre-gl-worker.mjs`);
-    if (!workerResponse.ok) throw new Error(`Could not load MapLibre worker (${workerResponse.status}).`);
-    const workerSource = await workerResponse.text();
-    const sharedUrl = `${base}maplibre-gl-shared.mjs`;
-    const workerBlob = new Blob([
-        workerSource.replaceAll('from"./maplibre-gl-shared.mjs"', `from"${sharedUrl}"`),
-    ], { type: "text/javascript" });
+    const workerBlob = new Blob([`import "${base}maplibre-gl-worker.mjs";`], { type: "text/javascript" });
     maplibregl.setWorkerUrl(URL.createObjectURL(workerBlob));
 
     map?.remove();

@@ -51,7 +51,7 @@ public final class McpShowMap {
                 .title("Show map")
                 .description(DESCRIPTION)
                 .annotations(new McpSchema.ToolAnnotations(null, true, false, true, false, null))
-                .meta(Map.of("ui", Map.of("resourceUri", McpMapPayload.RESOURCE_URI)))
+                .meta(Map.of("ui", Map.of("resourceUri", McpMapPayload.RESOURCE_URI, "csp", csp())))
                 .build();
         return McpServerFeatures.AsyncToolSpecification.builder()
                 .tool(schema)

@@ -1,0 +1,128 @@
+/*
+ * Copyright 2026 Joaquim Cardeira (joaquim_cardeira@hotmail.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.traccar.web;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+public class McpMapPayloadTest {
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    public void testDrawsATrackMarkersAndAShape() {
+        McpMapPayload.Built built = McpMapPayload.build(objectMapper, Map.of(
+                "layers", List.of(
+                        Map.of("kind", "positions", "uri", "traccar://route?deviceId=7&from=2026-10-29T08:00:00Z"
+                                + "&to=2026-10-29T09:00:00Z",
+                                "paint", Map.of("line-color", "#e11d48")),
+                        Map.of("kind", "geojson", "type", "fill", "data", Map.of(
+                                "type", "Feature",
+                                "geometry", Map.of(
+                                        "type", "Polygon",
+                                        "coordinates", List.of(List.of(
+                                                List.of(-9.2, 38.7),
+                                                List.of(-9.1, 38.7),
+                                                List.of(-9.1, 38.8),
+                                                List.of(-9.2, 38.7)))),
+                                "properties", Map.of()))),
+                "markers", List.of(Map.of("position", List.of(-9.1393, 38.7223), "label", "Van"))),
+                this::fetch);
+
+        assertTrue(built.text().contains("Markers: 1."));
+        assertTrue(built.text().contains("Track: 2 points"));
+        assertTrue(built.text().contains("Shape drawn."));
+        assertFalse(built.text().contains("38.7223"));
+        assertFalse(built.text().contains("-9.1393"));
+
+        assertEquals("https://tiles.openfreemap.org/styles/liberty", built.content().get("style"));
+        List<?> markers = (List<?>) built.content().get("markers");
+        assertEquals(1, markers.size());
+        Map<?, ?> marker = assertInstanceOf(Map.class, markers.get(0));
+        assertEquals(List.of(-9.1393, 38.7223), marker.get("position"));
+        assertEquals("Van", marker.get("label"));
+
+        List<?> layers = (List<?>) built.content().get("layers");
+        assertEquals(2, layers.size());
+        assertEquals("line", ((Map<?, ?>) layers.get(0)).get("type"));
+        assertEquals("#e11d48", ((Map<?, ?>) ((Map<?, ?>) layers.get(0)).get("paint")).get("line-color"));
+        assertEquals("fill", ((Map<?, ?>) layers.get(1)).get("type"));
+
+        Map<?, ?> camera = assertInstanceOf(Map.class, built.content().get("camera"));
+        List<?> bounds = assertInstanceOf(List.class, camera.get("bounds"));
+        assertEquals(4, bounds.size());
+    }
+
+    @Test
+    public void testDrawsLatestPositionsAsMarkers() {
+        McpMapPayload.Built built = McpMapPayload.build(objectMapper, Map.of(
+                "layers", List.of(Map.of("kind", "positions", "uri", "traccar://positions"))),
+                this::fetch);
+
+        assertTrue(built.text().contains("Latest positions: 2."));
+        assertFalse(built.text().contains("38.70"));
+        assertFalse(built.text().contains("-9.20"));
+        List<?> layers = (List<?>) built.content().get("layers");
+        assertTrue(layers.isEmpty());
+        List<?> markers = (List<?>) built.content().get("markers");
+        assertEquals(2, markers.size());
+        assertEquals("157 4701", ((Map<?, ?>) markers.get(0)).get("label"));
+        assertEquals(List.of(-9.14, 38.75), ((Map<?, ?>) markers.get(0)).get("position"));
+    }
+
+    @Test
+    public void testRejectsAPositionLayerWithoutALink() {
+        assertThrows(IllegalArgumentException.class, () -> McpMapPayload.build(
+                objectMapper,
+                Map.of("layers", List.of(Map.of("kind", "positions"))),
+                (path, arguments) -> "[]"));
+    }
+
+    @Test
+    public void testPageIncludesTheMapLibrary() {
+        String page = McpShowMap.page();
+        assertTrue(page.contains("maplibre-gl@6.12.0"));
+        assertTrue(page.contains("@modelcontextprotocol/ext-apps@2.0.4"));
+        assertTrue(page.contains("id=\"map\""));
+        var resource = McpShowMap.resource().resource();
+        assertEquals(McpMapPayload.RESOURCE_URI, resource.uri());
+        assertEquals(McpShowMap.MIME_TYPE, resource.mimeType());
+    }
+
+    private String fetch(String path, Map<String, Object> arguments) {
+        return switch (path) {
+            case "/reports/route" -> "[{\"deviceId\":7,\"latitude\":38.70,\"longitude\":-9.20,"
+                    + "\"fixTime\":\"2026-10-29T08:00:00Z\",\"speed\":10,\"valid\":true},"
+                    + "{\"deviceId\":7,\"latitude\":38.71,\"longitude\":-9.19,"
+                    + "\"fixTime\":\"2026-10-29T09:00:00Z\",\"speed\":20,\"valid\":true}]";
+            case "/positions" -> "[{\"deviceId\":157,\"latitude\":38.75,\"longitude\":-9.14,"
+                    + "\"speed\":54.5,\"valid\":true,\"attributes\":{\"route\":\"4701\"}},"
+                    + "{\"deviceId\":142,\"latitude\":38.60,\"longitude\":-9.10,\"valid\":false},"
+                    + "{\"deviceId\":4,\"latitude\":38.71,\"longitude\":-9.16,\"valid\":true}]";
+            default -> "[]";
+        };
+    }
+
+}
