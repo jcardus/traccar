@@ -30,7 +30,6 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -66,14 +65,11 @@ public class McpServerHolder implements AutoCloseable {
                 .prompts(true)
                 .build();
 
-        var tools = new ArrayList<McpServerFeatures.AsyncToolSpecification>();
-        toolRegistry.getTools().stream().map(this::createApiTool).forEach(tools::add);
-        tools.add(McpShowMap.tool(objectMapper, apiInvoker));
-
         server = McpServer.async(transport)
                 .serverInfo("traccar-mcp", "1.0.0")
                 .capabilities(capabilities)
-                .tools(tools)
+                .tools(toolRegistry.getTools().stream().map(this::createApiTool).toList())
+                .tools(McpShowMap.tool(objectMapper, apiInvoker))
                 .resources(McpShowMap.resource())
                 .resourceTemplates(resultTemplate())
                 .build();
