@@ -35,11 +35,7 @@ public final class McpShowMap {
     private static final String CDN = "https://cdn.jsdelivr.net";
     private static final String TILES = "https://tiles.openfreemap.org";
     private static final String DESCRIPTION =
-            "Shows the user an interactive map in the chat, with a traccar:// link, "
-                    + "GeoJSON layers, and markers on an OpenFreeMap basemap. "
-                    + "The user sees the map and you do not. The result is a summary. "
-                    + "Without center and zoom, the map fits the layers and markers. "
-                    + "Needs a client that supports MCP Apps.";
+            "Shows the user a map. You don't see it, and the result is a summary.";
 
     private static volatile String page;
 
@@ -128,26 +124,15 @@ public final class McpShowMap {
         Map<String, Object> layer = new LinkedHashMap<>();
         layer.put("type", "object");
         layer.put("properties", Map.of(
-                "kind", Map.of(
-                        "type", "string",
-                        "enum", List.of("positions", "geojson"),
-                        "description", "What the layer draws."),
                 "uri", Map.of(
                         "type", "string",
-                        "description", "traccar://positions for the latest fix of each device, "
-                                + "or a ranged traccar://positions or traccar://route link. "
-                                + "Do not include coordinates."),
-                "type", Map.of(
-                        "type", "string",
-                        "enum", List.of("fill", "line", "circle", "symbol", "fill-extrusion", "heatmap"),
-                        "description", "MapLibre layer type for a geojson layer."),
+                        "description", "A traccar:// link from a positions or route result."),
                 "data", Map.of(
                         "type", "object",
-                        "description", "Small inline GeoJSON for a geojson layer."),
+                        "description", "Inline GeoJSON."),
                 "paint", Map.of(
                         "type", "object",
-                        "description", "MapLibre paint, such as line-color or fill-color."),
-                "layout", Map.of("type", "object")));
+                        "description", "MapLibre paint.")));
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         schema.put("properties", Map.of(
@@ -166,14 +151,7 @@ public final class McpShowMap {
                                         "color", Map.of("type", "string")))),
                 "basemap", Map.of(
                         "type", "string",
-                        "enum", List.of("liberty", "bright", "positron", "dark", "fiord")),
-                "center", Map.of(
-                        "type", "array",
-                        "items", Map.of("type", "number"),
-                        "description", "[longitude, latitude]. Pass zoom with it."),
-                "zoom", Map.of("type", "number"),
-                "bearing", Map.of("type", "number"),
-                "pitch", Map.of("type", "number")));
+                        "enum", List.of("liberty", "bright", "positron", "dark", "fiord"))));
         return schema;
     }
 

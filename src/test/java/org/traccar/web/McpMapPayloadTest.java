@@ -32,13 +32,13 @@ public class McpMapPayloadTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    public void testDrawsATrackMarkersAndAShape() {
+    public void testDrawsPositionsMarkersAndAShape() {
         McpMapPayload.Built built = McpMapPayload.build(objectMapper, Map.of(
                 "layers", List.of(
-                        Map.of("kind", "positions", "uri", "traccar://route?deviceId=7&from=2026-10-29T08:00:00Z"
+                        Map.of("uri", "traccar://route?deviceId=7&from=2026-10-29T08:00:00Z"
                                 + "&to=2026-10-29T09:00:00Z",
                                 "paint", Map.of("line-color", "#e11d48")),
-                        Map.of("kind", "geojson", "type", "fill", "data", Map.of(
+                        Map.of("data", Map.of(
                                 "type", "Feature",
                                 "geometry", Map.of(
                                         "type", "Polygon",
@@ -52,7 +52,7 @@ public class McpMapPayloadTest {
                 this::fetch);
 
         assertTrue(built.text().contains("Markers: 1."));
-        assertTrue(built.text().contains("Track: 2 points"));
+        assertTrue(built.text().contains("Positions: 3."));
         assertTrue(built.text().contains("Shape drawn."));
         assertFalse(built.text().contains("38.7223"));
         assertFalse(built.text().contains("-9.1393"));
@@ -70,34 +70,34 @@ public class McpMapPayloadTest {
         assertEquals("#e11d48", ((Map<?, ?>) ((Map<?, ?>) layers.get(0)).get("paint")).get("line-color"));
         assertEquals("fill", ((Map<?, ?>) layers.get(1)).get("type"));
 
-        Map<?, ?> camera = assertInstanceOf(Map.class, built.content().get("camera"));
-        List<?> bounds = assertInstanceOf(List.class, camera.get("bounds"));
+        List<?> bounds = assertInstanceOf(List.class, built.content().get("bounds"));
         assertEquals(4, bounds.size());
     }
 
     @Test
-    public void testDrawsLatestPositionsAsMarkers() {
-        McpMapPayload.Built built = McpMapPayload.build(objectMapper, Map.of(
-                "layers", List.of(Map.of("kind", "positions", "uri", "traccar://positions"))),
-                this::fetch);
-
-        assertTrue(built.text().contains("Latest positions: 2."));
-        assertFalse(built.text().contains("38.70"));
-        assertFalse(built.text().contains("-9.20"));
-        List<?> layers = (List<?>) built.content().get("layers");
-        assertTrue(layers.isEmpty());
-        List<?> markers = (List<?>) built.content().get("markers");
-        assertEquals(2, markers.size());
-        assertEquals("157 4701", ((Map<?, ?>) markers.get(0)).get("label"));
-        assertEquals(List.of(-9.14, 38.75), ((Map<?, ?>) markers.get(0)).get("position"));
+    public void testRejectsALayerWithoutUriOrData() {
+        assertThrows(IllegalArgumentException.class, () -> McpMapPayload.build(
+                objectMapper,
+                Map.of("layers", List.of(Map.of("paint", Map.of()))),
+                (path, arguments) -> "[]"));
     }
 
     @Test
-    public void testRejectsAPositionLayerWithoutALink() {
+    public void testRejectsAnEmptyMap() {
         assertThrows(IllegalArgumentException.class, () -> McpMapPayload.build(
-                objectMapper,
-                Map.of("layers", List.of(Map.of("kind", "positions"))),
-                (path, arguments) -> "[]"));
+                objectMapper, Map.of("summary", "Nothing"), this::fetch));
+    }
+
+    @Test
+    public void testDrawsAPointAsACircle() {
+        McpMapPayload.Built built = McpMapPayload.build(objectMapper, Map.of(
+                "layers", List.of(Map.of("data", Map.of(
+                        "type", "Point", "coordinates", List.of(-9.14, 38.72))))),
+                this::fetch);
+
+        List<?> layers = (List<?>) built.content().get("layers");
+        assertEquals("circle", ((Map<?, ?>) layers.get(0)).get("type"));
+        assertEquals(List.of(-9.14, 38.72, -9.14, 38.72), built.content().get("bounds"));
     }
 
     @Test
@@ -116,11 +116,9 @@ public class McpMapPayloadTest {
             case "/reports/route" -> "[{\"deviceId\":7,\"latitude\":38.70,\"longitude\":-9.20,"
                     + "\"fixTime\":\"2026-10-29T08:00:00Z\",\"speed\":10,\"valid\":true},"
                     + "{\"deviceId\":7,\"latitude\":38.71,\"longitude\":-9.19,"
-                    + "\"fixTime\":\"2026-10-29T09:00:00Z\",\"speed\":20,\"valid\":true}]";
-            case "/positions" -> "[{\"deviceId\":157,\"latitude\":38.75,\"longitude\":-9.14,"
-                    + "\"speed\":54.5,\"valid\":true,\"attributes\":{\"route\":\"4701\"}},"
-                    + "{\"deviceId\":142,\"latitude\":38.60,\"longitude\":-9.10,\"valid\":false},"
-                    + "{\"deviceId\":4,\"latitude\":38.71,\"longitude\":-9.16,\"valid\":true}]";
+                    + "\"fixTime\":\"2026-10-29T08:30:00Z\",\"speed\":20,\"valid\":true},"
+                    + "{\"deviceId\":7,\"latitude\":38.72,\"longitude\":-9.18,"
+                    + "\"fixTime\":\"2026-10-29T09:00:00Z\",\"speed\":0,\"valid\":false}]";
             default -> "[]";
         };
     }

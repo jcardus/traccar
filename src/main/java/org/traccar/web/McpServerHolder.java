@@ -30,6 +30,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -65,11 +66,15 @@ public class McpServerHolder implements AutoCloseable {
                 .prompts(true)
                 .build();
 
+        var tools = new ArrayList<McpServerFeatures.AsyncToolSpecification>();
+        toolRegistry.getTools().stream().map(this::createApiTool).forEach(tools::add);
+        tools.add(McpShowMap.tool(objectMapper, apiInvoker));
+
         server = McpServer.async(transport)
                 .serverInfo("traccar-mcp", "1.0.0")
-                .instructions(McpResultLink.INSTRUCTIONS)
                 .capabilities(capabilities)
-                .tools(toolRegistry.getTools().stream().map(this::createApiTool).toList())
+                .tools(tools)
+                .resources(McpShowMap.resource())
                 .resourceTemplates(resultTemplate())
                 .build();
     }
@@ -112,8 +117,7 @@ public class McpServerHolder implements AutoCloseable {
                             return Mono.just(McpSchema.CallToolResult.builder().addTextContent(body).build());
                         }
                         String uri = McpResultLink.uri(tool.path(), request.arguments());
-                        String summary = McpResultLink.summary(
-                                objectMapper, tool.path(), request.arguments(), body);
+                        String summary = McpResultLink.summary(objectMapper, request.arguments(), body);
                         var link = McpSchema.ResourceLink.builder()
                                 .uri(uri)
                                 .name(McpResultLink.name(tool.path()))
@@ -137,8 +141,7 @@ public class McpServerHolder implements AutoCloseable {
     private McpServerFeatures.AsyncResourceTemplateSpecification resultTemplate() {
         var template = McpSchema.ResourceTemplate.builder("traccar://{kind}?{query}", "traccar-result")
                 .title("Traccar positions")
-                .description("JSON array of positions for a traccar:// URI. "
-                        + "Call resources/read with that URI. The tool result is only a summary.")
+                .description("Position JSON for a traccar:// URI.")
                 .mimeType("application/json")
                 .build();
         return new McpServerFeatures.AsyncResourceTemplateSpecification(template, this::readResult);
