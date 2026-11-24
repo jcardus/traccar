@@ -388,11 +388,25 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 || responseType == MSG_VIDEO_UPLOAD;
     }
 
-    // Folder the camera uploads to: /<imei>/<channel>-<start ms>-<end ms>-<requested at ms>/, the same layout the
-    // backend's recordings dialog and sync use, so the clips are listed with them.
-    static String clipPath(String uniqueId, int channel, long start, long end, long requestedAt) {
+    // Folder the camera uploads to: /<imei>/<channel>-<start ms>-<end ms>-<requested at ms>-<alarm type>/. The first
+    // four parts are the layout the backend's recordings dialog and sync use; the type (fatigue, seatBelt, dms60...)
+    // makes the clip self-describing, and keeps the backend from treating it as a synced recording.
+    static String clipPath(String uniqueId, int channel, long start, long end, long requestedAt, String type) {
         return "/" + uniqueId.replaceAll("[^A-Za-z0-9._-]", "_") + "/" + channel + "-" + start + "-" + end + "-"
-                + requestedAt + "/";
+                + requestedAt + "-" + type.replaceAll("[^A-Za-z0-9]", "") + "/";
+    }
+
+    // Named alarm (dmsAlarmType / adasAlarmType), else the camera's raw code per camera: dms60, adas52.
+    static String alarmType(Position position) {
+        String type = position.getString("dmsAlarmType");
+        if (type == null) {
+            type = position.getString("adasAlarmType");
+        }
+        if (type == null) {
+            boolean cabin = position.hasAttribute("dmsAlarm");
+            type = (cabin ? "dms" : "adas") + position.getInteger("vendorAlarmCode");
+        }
+        return type;
     }
 
     // True, and recorded in `history`, when a clip may be requested now.
@@ -445,7 +459,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         int cameraChannel = position.getInteger("vendorAlarmChannel");
         long start = alarmTime - getConfig().getInteger(Keys.PROTOCOL_CLIP_BEFORE.withPrefix(prefix)) * 1000L;
         long end = alarmTime + getConfig().getInteger(Keys.PROTOCOL_CLIP_AFTER.withPrefix(prefix)) * 1000L;
-        String path = clipPath(deviceSession.getUniqueId(), cameraChannel, start, end, now);
+        String path = clipPath(deviceSession.getUniqueId(), cameraChannel, start, end, now, alarmType(position));
 
         Command command = new Command();
         command.set(Command.KEY_SERVER, server);
