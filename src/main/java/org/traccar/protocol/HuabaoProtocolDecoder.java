@@ -194,7 +194,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             }
             if (model == null || !model.equals("VL300")) {
                 parsedMask |= (1L << 29) | (1L << 30);
-                if (BitUtil.check(value, 29) || BitUtil.check(value, 30)) {
+                // The G40 camera keeps bit 30 set on every report, so it is not an accident there
+                boolean rollover = BitUtil.check(value, 30) && !"G40".equals(model);
+                if (BitUtil.check(value, 29) || rollover) {
                     position.addAlarm(Position.ALARM_ACCIDENT);
                 }
             }

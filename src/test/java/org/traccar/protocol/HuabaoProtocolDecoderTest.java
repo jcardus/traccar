@@ -7,6 +7,24 @@ import org.traccar.model.Position;
 public class HuabaoProtocolDecoderTest extends ProtocolTest {
 
     @Test
+    public void testDecodeG40Alarm() throws Exception {
+
+        var decoder = inject(new HuabaoProtocolDecoder(null));
+
+        // bit 30 of the alarm field is an accident on other models
+        verifyAttribute(decoder, binary(
+                "7e0200004c062996769808017540000000001c100f0013c79e02db4f940027000000ba261124130012010400000138020200000302000025040000000030013d31012614040000000415040000000016040000000017020002e77e"),
+                Position.KEY_ALARM, Position.ALARM_ACCIDENT);
+
+        // but the G40 camera keeps it set on every report
+        decoder.setModelOverride("G40");
+        verifyAttribute(decoder, binary(
+                "7e0200004c062996769808017540000000001c100f0013c79e02db4f940027000000ba261124130012010400000138020200000302000025040000000030013d31012614040000000415040000000016040000000017020002e77e"),
+                Position.KEY_ALARM, null);
+
+    }
+
+    @Test
     public void testDecode() throws Exception {
 
         var decoder = inject(new HuabaoProtocolDecoder(null));
