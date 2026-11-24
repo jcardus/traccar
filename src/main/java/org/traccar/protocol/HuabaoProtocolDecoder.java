@@ -328,14 +328,39 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             position.set("vendorAlarmFlag", "end");
         }
         int idLength = buf.readUnsignedByte();
+        String alarm = Position.ALARM_GENERAL;
         if (buf.readerIndex() + idLength <= endIndex) {
-            position.set("vendorAlarmId", buf.readCharSequence(idLength, StandardCharsets.US_ASCII).toString());
+            String identifier = buf.readCharSequence(idLength, StandardCharsets.US_ASCII).toString();
+            position.set("vendorAlarmId", identifier);
             if (buf.readerIndex() < endIndex) {
                 position.set("vendorAlarmInfo",
                         ByteBufUtil.hexDump(buf, buf.readerIndex(), endIndex - buf.readerIndex()));
             }
+            alarm = decodeVendorAlarmCode(position, extension, identifier);
         }
-        position.addAlarm(Position.ALARM_GENERAL);
+        position.addAlarm(alarm);
+    }
+
+    // The identifier is <terminal>_<channel>_<time>_<n>_<code>, e.g. JA5057009_02_20261124182427_01_67. The code
+    // is the camera's own alarm code and, unlike the type number, is unique across the three extensions. 0xA5
+    // alarms come from the cabin camera (DMS), 0xA4 and 0xA8 from the road camera (ADAS). They are also exposed
+    // as dmsAlarm / adasAlarm so the web UI lists them; only the codes seen with a known cause are named.
+    private String decodeVendorAlarmCode(Position position, int extension, String identifier) {
+        String[] parts = identifier.split("_");
+        if (parts.length < 5 || !parts[1].matches("\\d+") || !parts[parts.length - 1].matches("\\d+")) {
+            return Position.ALARM_GENERAL;
+        }
+        int code = Integer.parseInt(parts[parts.length - 1]);
+        position.set("vendorAlarmChannel", Integer.parseInt(parts[1]));
+        position.set("vendorAlarmCode", code);
+        String prefix = extension == 0xA5 ? "dms" : "adas";
+        position.set(prefix + "Alarm", code);
+        position.set(prefix + "AlarmLevel", position.getInteger("vendorAlarmLevel"));
+        if (extension == 0xA5 && code == 67) { // confirmed on video: driver yawning with eyes shut
+            position.set("dmsAlarmType", "fatigue");
+            return "dmsFatigue";
+        }
+        return Position.ALARM_GENERAL;
     }
 
     private Position decodeVideoList(DeviceSession deviceSession, ByteBuf buf) {
