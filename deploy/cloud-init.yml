@@ -1,0 +1,47 @@
+#cloud-config
+
+write_files:
+  - path: /opt/traccar/traccar.xml
+    encoding: b64
+    content: ${TRACCAR_XML_B64}
+
+  - path: /opt/traccar/docker-compose.yml
+    content: |
+      services:
+
+        traccar:
+          image: ghcr.io/jcardus/traccar:jsrastreamento
+          restart: unless-stopped
+          healthcheck:
+            test: [ "CMD", "wget", "-q", "--spider", "http://localhost/api/health" ]
+            interval: 2m
+            timeout: 5s
+            start_period: 1h
+            retries: 3
+          network_mode: host
+          volumes:
+            - /opt/traccar/traccar.xml:/opt/traccar/conf/traccar.xml:ro
+            - /opt/traccar/logs:/opt/traccar/logs
+
+        autoheal:
+          image: willfarrell/autoheal:latest
+          restart: always
+          environment:
+            AUTOHEAL_CONTAINER_LABEL: all
+            AUTOHEAL_INTERVAL: 60
+            AUTOHEAL_START_PERIOD: 3600
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+
+        watchtower:
+          image: containrrr/watchtower:latest
+          restart: always
+          environment:
+            WATCHTOWER_CLEANUP: "true"
+            WATCHTOWER_SCHEDULE: "0 */30 * * * *"
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+
+runcmd:
+  - mkdir -p /opt/traccar/logs
+  - cd /opt/traccar && docker compose up -d

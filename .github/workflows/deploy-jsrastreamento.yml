@@ -1,0 +1,109 @@
+name: Deploy JSRastreamento
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: Hetzner server name
+        default: traccar-jsrastreamento
+        required: true
+      server_type:
+        description: Hetzner server type
+        default: cx23
+        required: true
+      location:
+        description: Hetzner location
+        default: nbg1
+        required: true
+  push:
+    branches: [jsrastreamento]
+
+jobs:
+  build-image:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - run: ./gradlew build
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: traccar-web/package-lock.json
+
+      - run: npm ci && npm run build
+        working-directory: traccar-web
+
+      - name: Package
+        working-directory: setup
+        run: ./package.sh preview other
+
+      - name: Prepare Docker context
+        run: |
+          mkdir -p docker-context/installers
+          cp setup/traccar-other-preview.zip docker-context/installers/
+          cp docker/Dockerfile.ubuntu docker-context/Dockerfile
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: docker-context
+          file: docker-context/Dockerfile
+          build-args: VERSION=preview
+          push: true
+          tags: ghcr.io/jcardus/traccar:jsrastreamento
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Create Hetzner server
+    needs: build-image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install hcloud CLI
+        run: |
+          curl -fsSL https://github.com/hetznercloud/cli/releases/latest/download/hcloud-linux-amd64.tar.gz \
+            | tar -xz hcloud
+          sudo mv hcloud /usr/local/bin/
+
+      - name: Create server
+        env:
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+          SERVER_NAME: ${{ github.event.inputs.server_name || format('traccar-jsrastreamento-{0}', github.run_number) }}
+          SERVER_TYPE: ${{ github.event.inputs.server_type || 'cx23' }}
+          LOCATION: ${{ github.event.inputs.location || 'nbg1' }}
+          DATABASE_HOST: ${{ secrets.DATABASE_HOST }}
+          DATABASE_USER: ${{ secrets.DATABASE_USER }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          SMTP_USER_NAME: ${{ secrets.SMTP_USER_NAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_SMTP_FROM: ${{ secrets.MAIL_SMTP_FROM }}
+          NOTIFICATOR_FIREBASE_SERVICE_ACCOUNT: ${{ secrets.NOTIFICATOR_FIREBASE_SERVICE_ACCOUNT }}
+          SMS_HTTP_AUTHORIZATION: ${{ secrets.SMS_HTTP_AUTHORIZATION }}
+          GEOLOCATION_KEY: ${{ secrets.GEOLOCATION_KEY }}
+        run: bash deploy/hcloud-create.sh
