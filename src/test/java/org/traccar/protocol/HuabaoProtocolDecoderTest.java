@@ -28,6 +28,13 @@ public class HuabaoProtocolDecoderTest extends ProtocolTest {
                 "timezone", "UTC+08:00");
 
         verifyAttribute(decoder, binary(
+                "7e120500220133456789060001000100000001012607272200002607272201000000000000000000020000000f4240a47e"),
+                "videoResources",
+                "[{\"channel\":1,\"startTime\":1785160800000,\"endTime\":1785160860000,"
+                        + "\"alarmFlag\":0,\"resourceType\":2,\"streamType\":0,\"storageType\":0,"
+                        + "\"fileSize\":1000000}]");
+
+        verifyAttribute(decoder, binary(
                 "7e0200009e017721028890061b00000000004c000301d9f2d4073ca28d002b01c2000024011017260501040000023c3001193101162504000000001404000000011504000000041604000000001702000018030000002b0400000000e10400735443e20400001211e30a4e61747572654c696e6be635244f42442d52542c2c35352e3030302c3130332e37382c2c302e302c342c2c2c2c302e3030302c2c31323336302e32382c2c2c0d0aa27e"),
                 Position.KEY_RPM, 55.0);
 

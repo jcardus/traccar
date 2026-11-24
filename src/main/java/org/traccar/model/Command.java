@@ -61,6 +61,9 @@ public class Command extends BaseCommand {
     public static final String TYPE_MODE_POWER_SAVING = "modePowerSaving";
     public static final String TYPE_MODE_DEEP_SLEEP = "modeDeepSleep";
     public static final String TYPE_VIDEO_START = "videoStart";
+    public static final String TYPE_VIDEO_STOP = "videoStop";
+    public static final String TYPE_VIDEO_LIST = "videoList";
+    public static final String TYPE_VIDEO_PLAYBACK = "videoPlayback";
 
     public static final String TYPE_ALARM_GEOFENCE = "alarmGeofence";
     public static final String TYPE_ALARM_BATTERY = "alarmBattery";
@@ -84,6 +87,12 @@ public class Command extends BaseCommand {
     public static final String KEY_PHONE = "phone";
     public static final String KEY_SERVER = "server";
     public static final String KEY_PORT = "port";
+    public static final String KEY_START_TIME = "startTime";
+    public static final String KEY_END_TIME = "endTime";
+    public static final String KEY_ALARM_FLAG = "alarmFlag";
+    public static final String KEY_RESOURCE_TYPE = "resourceType";
+    public static final String KEY_STREAM_TYPE = "streamType";
+    public static final String KEY_STORAGE_TYPE = "storageType";
     public static final String KEY_NO_QUEUE = "noQueue";
 
     @QueryIgnore
