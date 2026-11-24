@@ -43,7 +43,7 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         data.writeShort(port); // TCP media port
         data.writeShort(port); // UDP media port
         data.writeByte(channel);
-        data.writeByte(1); // video
+        data.writeByte(0); // audio and video
         data.writeByte(0); // main stream
     }
 
