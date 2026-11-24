@@ -1,10 +1,32 @@
 package org.traccar.protocol;
 
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.traccar.ProtocolTest;
 import org.traccar.model.Position;
 
 public class HuabaoProtocolDecoderTest extends ProtocolTest {
+
+    @Test
+    public void testClipPath() {
+        assertEquals("/062996769808/2-1000-2000-3000/",
+                HuabaoProtocolDecoder.clipPath("062996769808", 2, 1000, 2000, 3000));
+        assertEquals("/a_b/1-1-2-3/", HuabaoProtocolDecoder.clipPath("a b", 1, 1, 2, 3));
+    }
+
+    @Test
+    public void testAllowClip() {
+        var history = new java.util.LinkedList<Long>();
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_000_000L, 60, 3));
+        assertFalse(HuabaoProtocolDecoder.allowClip(history, 1_030_000L, 60, 3)); // too soon
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_070_000L, 60, 3));
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_140_000L, 60, 3));
+        assertFalse(HuabaoProtocolDecoder.allowClip(history, 1_210_000L, 60, 3)); // hourly cap
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_000_000L + 3_700_000L, 60, 3)); // a new hour
+    }
 
     @Test
     public void testDecodeG40Alarm() throws Exception {
@@ -118,6 +140,15 @@ public class HuabaoProtocolDecoderTest extends ProtocolTest {
                 "7e020000a206299676980808fb40000000001c100f0013cdb702db8a850028005a015e261124164429010400000220020200000302005a25040000000030013331012414040000000415040000000016040000000017020002a3020000a55000000015000201000900280013cdb702db8a852611241644290401214a41353035373030395f30325f32303236313132343136343432395f30315f363100020100010003322d310003322d3100000000517e"),
                 Position.KEY_ALARM, "dmsPhoneUse");
 
+        // road camera: 0xA4 code 84, a car close ahead at 76 km/h; cabin camera: 0xA5 code 60, eyes shut
+        verifyAttribute(decoder, binary(
+                "7e020000a506299676980800b400000000001c100f0013b6fe02db9600002202f8011526112418303001040000024e02020000030202f825040000000030013531012414040000000415040000000016040000000017020002a3020000a45300000002000302000000004c00220013b6fe02db96002611241830300401214a41353035373030395f30315f32303236313132343138333033305f30315f383400020100010003312d310003312d31000000002d7e"),
+                Position.KEY_ALARM, "adasFollowingDistance");
+
+        verifyAttribute(decoder, binary(
+                "7e020000a206299676980800df00000000001c100f0013a36e02dbb879001f00f000bf26112418335401040000025f02020000030200f025040000000030014131012214040000000415040000000016040000000017020002a3020000a550000000070001010018001f0013a36e02dbb8792611241833540401214a41353035373030395f30325f32303236313132343138333335345f30315f363000020100010003322d310003322d3100000000d37e"),
+                Position.KEY_ALARM, "dmsEyesClosed");
+
         decoder.setModelOverride(null);
 
         // sleepy driver at 18:24:27 (confirmed on the camera video): 0xA5 type 1, code 67
@@ -157,6 +188,15 @@ public class HuabaoProtocolDecoderTest extends ProtocolTest {
         verifyAttribute(decoder, binary(
                 "7e020000aa062996769808006100000000001c100f0013b2df02dbb724001f012c006026112418220601040000023d020200000302012c25040000000030013f31012314040000000415040000000016040000000017020002a3020000a858000000010002010000000000000000001e001f0013b2df02dbb7242611241822060401214a41353035373030395f30315f32303236313132343138323230365f30315f353200020100010003312d310003312d3100000000a47e"),
                 "vendorAlarmId", "JA5057009_01_20261124182206_01_52");
+
+        // camera ack (result 0) of a 0x9101 video request, real frame
+        verifyAttribute(decoder, binary(
+                "7e00010005062996769808076a0000910100a67e"),
+                Position.KEY_RESULT, "0x9101 accepted");
+
+        verifyAttribute(decoder, binary(
+                "7e1206000706299676980800010001000100010000e07e"),
+                Position.KEY_RESULT, "0x9206 upload completed");
 
         verifyAttribute(decoder, binary(
                 "7e020000aa062996769808006100000000001c100f0013b2df02dbb724001f012c006026112418220601040000023d020200000302012c25040000000030013f31012314040000000415040000000016040000000017020002a3020000a858000000010002010000000000000000001e001f0013b2df02dbb7242611241822060401214a41353035373030395f30315f32303236313132343138323230365f30315f353200020100010003312d310003312d3100000000a47e"),

@@ -338,6 +338,76 @@ public final class Keys {
             false);
 
     /**
+     * FTP server the camera uploads an alarm clip to (JT/T 1078 0x9206), e.g. the media server. Together with
+     * the username and password this enables requesting a clip around every active-safety alarm.
+     */
+    public static final ConfigSuffix<String> PROTOCOL_CLIP_SERVER = new StringConfigSuffix(
+            ".clip.server",
+            List.of(KeyType.CONFIG, KeyType.DEVICE));
+
+    /**
+     * FTP port for alarm clips.
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_PORT = new IntegerConfigSuffix(
+            ".clip.port",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            21);
+
+    /**
+     * FTP username for alarm clips.
+     */
+    public static final ConfigSuffix<String> PROTOCOL_CLIP_USERNAME = new StringConfigSuffix(
+            ".clip.username",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * FTP password for alarm clips.
+     */
+    public static final ConfigSuffix<String> PROTOCOL_CLIP_PASSWORD = new StringConfigSuffix(
+            ".clip.password",
+            List.of(KeyType.CONFIG));
+
+    /**
+     * Seconds of video before the alarm in the requested clip.
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_BEFORE = new IntegerConfigSuffix(
+            ".clip.before",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            15);
+
+    /**
+     * Seconds of video after the alarm in the requested clip.
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_AFTER = new IntegerConfigSuffix(
+            ".clip.after",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            20);
+
+    /**
+     * Minimum seconds between two clip requests to the same device.
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_INTERVAL = new IntegerConfigSuffix(
+            ".clip.interval",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            60);
+
+    /**
+     * Maximum clip requests per device per hour, so a busy camera does not drain its SIM.
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_MAX_PER_HOUR = new IntegerConfigSuffix(
+            ".clip.maxPerHour",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            30);
+
+    /**
+     * Links the camera may use for the clip upload: 1 Wi-Fi, 2 LAN, 4 mobile data (sum for several).
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_NETWORK = new IntegerConfigSuffix(
+            ".clip.network",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            7);
+
+    /**
      * Protocol format includes a language field.
      */
     public static final ConfigSuffix<Boolean> PROTOCOL_LANGUAGE = new BooleanConfigSuffix(

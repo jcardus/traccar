@@ -22,6 +22,7 @@ import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.traccar.BaseProtocolDecoder;
+import org.traccar.config.Keys;
 import org.traccar.helper.BufferUtil;
 import org.traccar.model.WifiAccessPoint;
 import org.traccar.session.DeviceSession;
@@ -32,7 +33,9 @@ import org.traccar.helper.BitUtil;
 import org.traccar.helper.Checksum;
 import org.traccar.helper.DateBuilder;
 import org.traccar.helper.UnitsConverter;
+import org.traccar.helper.DateUtil;
 import org.traccar.model.CellTower;
+import org.traccar.model.Command;
 import org.traccar.model.Network;
 import org.traccar.model.Position;
 
@@ -73,6 +76,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_VIDEO_CONTROL = 0x9102;
     public static final int MSG_VIDEO_PLAYBACK = 0x9201;
     public static final int MSG_VIDEO_LIST = 0x9205;
+    public static final int MSG_VIDEO_UPLOAD = 0x9206;
+    public static final int MSG_VIDEO_UPLOAD_COMPLETE = 0x1206;
     public static final int MSG_VIDEO_LIST_RESPONSE = 0x1205;
     public static final int MSG_TERMINAL_AUTH = 0x0102;
     public static final int MSG_LOCATION_REPORT = 0x0200;
@@ -356,19 +361,112 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         String prefix = extension == 0xA5 ? "dms" : "adas";
         position.set(prefix + "Alarm", code);
         position.set(prefix + "AlarmLevel", position.getInteger("vendorAlarmLevel"));
+        String name = null;
         if (extension == 0xA5) { // cabin camera codes confirmed on video
-            String name = switch (code) {
+            name = switch (code) {
+                case 60 -> "eyesClosed"; // driver with eyes shut
                 case 61 -> "phoneUse"; // driver on the phone
                 case 66 -> "seatBelt"; // no belt across the driver
-                case 67 -> "fatigue"; // yawning with eyes shut
+                case 67 -> "fatigue"; // yawning
                 default -> null;
             };
-            if (name != null) {
-                position.set("dmsAlarmType", name);
-                return "dms" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
-            }
+        } else if (extension == 0xA4 && code == 84) {
+            name = "followingDistance"; // a car close ahead at speed, on both occasions seen on video
+        }
+        if (name != null) {
+            position.set(prefix + "AlarmType", name);
+            return prefix + Character.toUpperCase(name.charAt(0)) + name.substring(1);
         }
         return Position.ALARM_GENERAL;
+    }
+
+    private static boolean isVideoResponse(int responseType) {
+        return responseType == MSG_VIDEO_REQUEST
+                || responseType == MSG_VIDEO_CONTROL
+                || responseType == MSG_VIDEO_PLAYBACK
+                || responseType == MSG_VIDEO_LIST
+                || responseType == MSG_VIDEO_UPLOAD;
+    }
+
+    // Folder the camera uploads to: /<imei>/<channel>-<start ms>-<end ms>-<requested at ms>/, the same layout the
+    // backend's recordings dialog and sync use, so the clips are listed with them.
+    static String clipPath(String uniqueId, int channel, long start, long end, long requestedAt) {
+        return "/" + uniqueId.replaceAll("[^A-Za-z0-9._-]", "_") + "/" + channel + "-" + start + "-" + end + "-"
+                + requestedAt + "/";
+    }
+
+    // True, and recorded in `history`, when a clip may be requested now.
+    static boolean allowClip(List<Long> history, long now, int intervalSeconds, int maxPerHour) {
+        history.removeIf(time -> now - time > 3600_000L);
+        if (!history.isEmpty() && now - history.get(history.size() - 1) < intervalSeconds * 1000L) {
+            return false;
+        }
+        if (history.size() >= maxPerHour) {
+            return false;
+        }
+        history.add(now);
+        return true;
+    }
+
+    // Ask the camera (0x9206) to FTP a clip around a live active-safety alarm. Needs huabao.clip.server, .username
+    // and .password; limited per device by .clip.interval and .clip.maxPerHour.
+    private void requestAlarmClip(
+            Channel channel, SocketAddress remoteAddress, ByteBuf id, DeviceSession deviceSession,
+            Position position) {
+        if (channel == null || position == null || !position.hasAttribute("vendorAlarmChannel")) {
+            return;
+        }
+        String prefix = getProtocolName();
+        String server = getConfig().getString(Keys.PROTOCOL_CLIP_SERVER.withPrefix(prefix));
+        String username = getConfig().getString(Keys.PROTOCOL_CLIP_USERNAME.withPrefix(prefix));
+        String password = getConfig().getString(Keys.PROTOCOL_CLIP_PASSWORD.withPrefix(prefix));
+        // a secret that is not set renders as an empty string in traccar.xml
+        if (server == null || server.isBlank() || username == null || username.isBlank()
+                || password == null || password.isBlank()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        long alarmTime = position.getFixTime().getTime();
+        if (Math.abs(now - alarmTime) > 10 * 60_000L) {
+            return; // an old alarm, e.g. replayed from the camera's buffer
+        }
+        List<Long> history = deviceSession.get("clipRequests");
+        if (history == null) {
+            history = new LinkedList<>();
+            deviceSession.set("clipRequests", history);
+        }
+        synchronized (history) {
+            if (!allowClip(history, now,
+                    getConfig().getInteger(Keys.PROTOCOL_CLIP_INTERVAL.withPrefix(prefix)),
+                    getConfig().getInteger(Keys.PROTOCOL_CLIP_MAX_PER_HOUR.withPrefix(prefix)))) {
+                return;
+            }
+        }
+        int cameraChannel = position.getInteger("vendorAlarmChannel");
+        long start = alarmTime - getConfig().getInteger(Keys.PROTOCOL_CLIP_BEFORE.withPrefix(prefix)) * 1000L;
+        long end = alarmTime + getConfig().getInteger(Keys.PROTOCOL_CLIP_AFTER.withPrefix(prefix)) * 1000L;
+        String path = clipPath(deviceSession.getUniqueId(), cameraChannel, start, end, now);
+
+        Command command = new Command();
+        command.set(Command.KEY_SERVER, server);
+        command.set(Command.KEY_PORT, getConfig().getInteger(Keys.PROTOCOL_CLIP_PORT.withPrefix(prefix)));
+        command.set(Command.KEY_USERNAME, username);
+        command.set(Command.KEY_PASSWORD, password);
+        command.set(Command.KEY_PATH, path);
+        command.set(Command.KEY_INDEX, cameraChannel);
+        command.set(Command.KEY_START_TIME, DateUtil.formatDate(new Date(start)));
+        command.set(Command.KEY_END_TIME, DateUtil.formatDate(new Date(end)));
+        command.set(
+                Command.KEY_NETWORK_CONDITION,
+                getConfig().getInteger(Keys.PROTOCOL_CLIP_NETWORK.withPrefix(prefix)));
+        ByteBuf data = Unpooled.buffer();
+        HuabaoProtocolEncoder.encodeVideoUploadData(data, command, deviceSession.get(DeviceSession.KEY_TIMEZONE));
+        // sendGeneralResponse has consumed `id`, so use a copy of its bytes
+        ByteBuf terminal = Unpooled.wrappedBuffer(ByteBufUtil.getBytes(id, 0, id.writerIndex()));
+        channel.writeAndFlush(new NetworkMessage(
+                formatMessage(delimiter, MSG_VIDEO_UPLOAD, terminal, false, data), remoteAddress));
+        LOGGER.info("Huabao [{}] alarm clip requested channel={} code={} path={}",
+                deviceSession.getUniqueId(), cameraChannel, position.getInteger("vendorAlarmCode"), path);
     }
 
     private Position decodeVideoList(DeviceSession deviceSession, ByteBuf buf) {
@@ -563,6 +661,37 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         formatMessage(delimiter, MSG_TERMINAL_REGISTER_RESPONSE, id, false, response), remoteAddress));
             }
 
+        } else if (type == MSG_TERMINAL_GENERAL_RESPONSE && buf.readableBytes() >= 5 + 2 && isVideoResponse(
+                buf.getUnsignedShort(buf.readerIndex() + 2))) {
+
+            buf.readUnsignedShort(); // response serial number
+            int responseType = buf.readUnsignedShort();
+            int result = buf.readUnsignedByte();
+
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            getLastLocation(position, null);
+            String commandType = String.format("0x%04X", responseType);
+            position.set(
+                    Position.KEY_RESULT,
+                    result == RESULT_SUCCESS ? commandType + " accepted" : commandType + " rejected: " + result);
+            return position;
+
+        } else if (type == MSG_VIDEO_UPLOAD_COMPLETE) {
+
+            buf.readUnsignedShort(); // response serial number
+            int result = buf.readUnsignedByte();
+
+            sendGeneralResponse(channel, remoteAddress, id, type, index);
+
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            getLastLocation(position, null);
+            position.set(
+                    Position.KEY_RESULT,
+                    result == 0 ? "0x9206 upload completed" : "0x9206 upload failed: " + result);
+            return position;
+
         } else if (type == MSG_REPORT_TEXT_MESSAGE) {
 
             sendGeneralResponse(channel, remoteAddress, id, type, index);
@@ -618,7 +747,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
             sendGeneralResponse(channel, remoteAddress, id, type, index);
 
-            return decodeLocation(deviceSession, buf);
+            Position position = decodeLocation(deviceSession, buf);
+            requestAlarmClip(channel, remoteAddress, id, deviceSession, position);
+            return position;
 
         } else if (type == MSG_LOCATION_REPORT_2 || type == MSG_LOCATION_REPORT_BLIND) {
 

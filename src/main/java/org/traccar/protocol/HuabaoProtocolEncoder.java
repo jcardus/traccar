@@ -65,6 +65,38 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         data.writeBytes(DataConverter.parseHex(dateFormat.format(DateUtil.parseDate(value))));
     }
 
+    private static void writeString(ByteBuf data, String value) {
+        byte[] bytes = (value != null ? value : "").getBytes(StandardCharsets.US_ASCII);
+        data.writeByte(bytes.length);
+        data.writeBytes(bytes);
+    }
+
+    // JT/T 1078 0x9206 file upload: the device uploads its SD-card recordings for the time range to an FTP
+    // server, then reports 0x1206 when done. The network condition is a bitmask of the links the upload may
+    // use (bit 0 Wi-Fi, bit 1 LAN, bit 2 3G/4G); it defaults to Wi-Fi only so a bulk upload doesn't use
+    // mobile data.
+    static int encodeVideoUploadData(ByteBuf data, Command command, TimeZone timeZone) {
+        int networkCondition = command.hasAttribute(Command.KEY_NETWORK_CONDITION)
+                ? command.getInteger(Command.KEY_NETWORK_CONDITION) : 0x01;
+        writeString(data, command.getString(Command.KEY_SERVER));
+        data.writeShort(command.getInteger(Command.KEY_PORT));
+        writeString(data, command.getString(Command.KEY_USERNAME));
+        writeString(data, command.getString(Command.KEY_PASSWORD));
+        writeString(data, command.getString(Command.KEY_PATH));
+        data.writeByte(command.getInteger(Command.KEY_INDEX)); // logical channel, 0 = all channels
+        writeVideoDate(data, command.getString(Command.KEY_START_TIME), timeZone);
+        writeVideoDate(data, command.getString(Command.KEY_END_TIME), timeZone);
+        data.writeLong(command.hasAttribute(Command.KEY_ALARM_FLAG) ? command.getLong(Command.KEY_ALARM_FLAG) : 0);
+        data.writeByte(command.hasAttribute(Command.KEY_RESOURCE_TYPE)
+                ? command.getInteger(Command.KEY_RESOURCE_TYPE) : 0);
+        data.writeByte(command.hasAttribute(Command.KEY_STREAM_TYPE)
+                ? command.getInteger(Command.KEY_STREAM_TYPE) : 0);
+        data.writeByte(command.hasAttribute(Command.KEY_STORAGE_TYPE)
+                ? command.getInteger(Command.KEY_STORAGE_TYPE) : 0);
+        data.writeByte(networkCondition);
+        return networkCondition;
+    }
+
     static void encodeVideoListData(
             ByteBuf data, int channel, String startTime, String endTime, long alarmFlag, TimeZone timeZone) {
         data.writeByte(channel); // logical channel, 0 = all channels
@@ -198,6 +230,10 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                     writeVideoDate(data, command.getString(Command.KEY_END_TIME), playbackTimeZone);
                     return HuabaoProtocolDecoder.formatMessage(
                             0x7e, HuabaoProtocolDecoder.MSG_VIDEO_PLAYBACK, id, false, data);
+                case Command.TYPE_VIDEO_UPLOAD:
+                    encodeVideoUploadData(data, command, videoTimeZone(command.getDeviceId()));
+                    return HuabaoProtocolDecoder.formatMessage(
+                            0x7e, HuabaoProtocolDecoder.MSG_VIDEO_UPLOAD, id, false, data);
                 default:
                     return null;
             }
