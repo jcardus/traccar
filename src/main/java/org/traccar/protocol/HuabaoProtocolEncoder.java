@@ -38,14 +38,14 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         super(protocol);
     }
 
-    static void encodeVideoRequestData(ByteBuf data, String server, int port, int channel) {
+    static void encodeVideoRequestData(ByteBuf data, String server, int port, int channel, int dataType) {
         byte[] serverBytes = server.getBytes(StandardCharsets.US_ASCII);
         data.writeByte(serverBytes.length);
         data.writeBytes(serverBytes);
         data.writeShort(port); // TCP media port
         data.writeShort(port); // UDP media port
         data.writeByte(channel);
-        data.writeByte(0); // audio and video
+        data.writeByte(dataType); // 0 = audio and video, 1 = video only
         data.writeByte(0); // main stream
     }
 
@@ -149,11 +149,15 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                                 0x7e, HuabaoProtocolDecoder.MSG_TERMINAL_CONTROL, id, false, data);
                     }
                 case Command.TYPE_VIDEO_START:
+                    // Video only by default: some cameras never open the media connection when audio is requested
+                    int dataType = command.hasAttribute(Command.KEY_DATA_TYPE)
+                            ? command.getInteger(Command.KEY_DATA_TYPE) : 1;
                     encodeVideoRequestData(
                             data,
                             command.getString(Command.KEY_SERVER),
                             command.getInteger(Command.KEY_PORT),
-                            command.getInteger(Command.KEY_INDEX));
+                            command.getInteger(Command.KEY_INDEX),
+                            dataType);
                     return HuabaoProtocolDecoder.formatMessage(
                             0x7e, HuabaoProtocolDecoder.MSG_VIDEO_REQUEST, id, false, data);
                 case Command.TYPE_VIDEO_STOP:

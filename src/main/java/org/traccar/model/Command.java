@@ -93,6 +93,7 @@ public class Command extends BaseCommand {
     public static final String KEY_RESOURCE_TYPE = "resourceType";
     public static final String KEY_STREAM_TYPE = "streamType";
     public static final String KEY_STORAGE_TYPE = "storageType";
+    public static final String KEY_DATA_TYPE = "dataType";
     public static final String KEY_NO_QUEUE = "noQueue";
 
     @QueryIgnore
