@@ -17,12 +17,12 @@ public class HuabaoProtocolEncoderTest extends ProtocolTest {
     @Test
     public void testEncodeVideoRequestData() {
         var data = Unpooled.buffer();
-        HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1, 1);
+        HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1, 1, 0);
         assertEquals(
                 "126d656469612d69702e6e2d6770732e636f6d27122712010100",
                 ByteBufUtil.hexDump(data));
         data.clear();
-        HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1, 0);
+        HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1, 0, 0);
         assertEquals(
                 "126d656469612d69702e6e2d6770732e636f6d27122712010000",
                 ByteBufUtil.hexDump(data));
@@ -66,6 +66,16 @@ public class HuabaoProtocolEncoderTest extends ProtocolTest {
         } finally {
             data.release();
         }
+    }
+
+    @Test
+    public void testEncodeVideoRequestSubStream() {
+        var data = Unpooled.buffer();
+        HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1, 1, 1);
+        assertEquals(
+                "126d656469612d69702e6e2d6770732e636f6d27122712010101",
+                ByteBufUtil.hexDump(data));
+        data.release();
     }
 
     @Disabled

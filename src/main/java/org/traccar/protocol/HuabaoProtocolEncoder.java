@@ -38,7 +38,8 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         super(protocol);
     }
 
-    static void encodeVideoRequestData(ByteBuf data, String server, int port, int channel, int dataType) {
+    static void encodeVideoRequestData(
+            ByteBuf data, String server, int port, int channel, int dataType, int streamType) {
         byte[] serverBytes = server.getBytes(StandardCharsets.US_ASCII);
         data.writeByte(serverBytes.length);
         data.writeBytes(serverBytes);
@@ -46,7 +47,7 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         data.writeShort(port); // UDP media port
         data.writeByte(channel);
         data.writeByte(dataType); // 0 = audio and video, 1 = video only
-        data.writeByte(0); // main stream
+        data.writeByte(streamType); // 0 = main stream, 1 = sub stream
     }
 
     // Cameras index SD-card recordings in their own local time, so the video
@@ -152,12 +153,15 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                     // Video only by default: some cameras never open the media connection when audio is requested
                     int dataType = command.hasAttribute(Command.KEY_DATA_TYPE)
                             ? command.getInteger(Command.KEY_DATA_TYPE) : 1;
+                    int streamType = command.hasAttribute(Command.KEY_STREAM_TYPE)
+                            ? command.getInteger(Command.KEY_STREAM_TYPE) : 0;
                     encodeVideoRequestData(
                             data,
                             command.getString(Command.KEY_SERVER),
                             command.getInteger(Command.KEY_PORT),
                             command.getInteger(Command.KEY_INDEX),
-                            dataType);
+                            dataType,
+                            streamType);
                     return HuabaoProtocolDecoder.formatMessage(
                             0x7e, HuabaoProtocolDecoder.MSG_VIDEO_REQUEST, id, false, data);
                 case Command.TYPE_VIDEO_STOP:
