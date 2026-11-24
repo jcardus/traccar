@@ -300,21 +300,28 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
-    // Vendor alarm extension 0xA5 seen on a Hikvision camera (no T/JSATL12 0x64/0x65 items):
-    // alarm id (4), flag (1), type (1), level (1), reserved (1), speed (1), altitude (2), latitude (4),
-    // longitude (4), time (6), vehicle status (2), identifier string (1 length + ASCII), then an
-    // undocumented tail that is kept as hex. The alarm type meanings are not known yet, so the raw
-    // numbers are exposed.
-    private void decodeVendorAlarm(Position position, ByteBuf buf, int length) {
-        if (length < 28) {
+    // Vendor alarm extensions 0xA4, 0xA5 and 0xA8 seen on a Hikvision camera (no T/JSATL12 0x64/0x65 items).
+    // They share a layout: alarm id (4), flag (1), type (1), level (1), alarm specific bytes (4 for 0xA4,
+    // 1 for 0xA5, 9 for 0xA8), speed (1), altitude (2), latitude (4), longitude (4), time (6), vehicle
+    // status (2), identifier string (1 length + ASCII), then an undocumented tail kept as hex. Type numbers
+    // are only meaningful together with the extension id, and their meanings are not known yet, so the
+    // raw numbers are exposed.
+    private void decodeVendorAlarm(Position position, ByteBuf buf, int length, int extension) {
+        int extra = switch (extension) {
+            case 0xA4 -> 4;
+            case 0xA8 -> 9;
+            default -> 1;
+        };
+        if (length < 27 + extra + 1) {
             return;
         }
         int endIndex = buf.readerIndex() + length;
         position.set("alarmIndex", (int) buf.readUnsignedInt());
         int flag = buf.readUnsignedByte(); // 0 = point event, 1 = start, 2 = end
+        position.set("vendorAlarmExt", String.format("%02x", extension));
         position.set("vendorAlarmType", buf.readUnsignedByte());
         position.set("vendorAlarmLevel", buf.readUnsignedByte());
-        buf.skipBytes(1 + 1 + 2 + 4 + 4 + 6 + 2); // reserved, speed, altitude, lat, lon, time, vehicle status
+        buf.skipBytes(extra + 1 + 2 + 4 + 4 + 6 + 2); // specific bytes, speed, altitude, lat, lon, time, status
         if (flag == 1) {
             position.set("vendorAlarmFlag", "start");
         } else if (flag == 2) {
@@ -879,8 +886,10 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0x25:
                     position.set(Position.KEY_INPUT, buf.readUnsignedInt());
                     break;
+                case 0xA4:
                 case 0xA5:
-                    decodeVendorAlarm(position, buf, length);
+                case 0xA8:
+                    decodeVendorAlarm(position, buf, length, subtype);
                     break;
                 case 0x2B:
                 case 0xA7:
