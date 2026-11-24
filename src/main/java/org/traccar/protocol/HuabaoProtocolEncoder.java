@@ -21,6 +21,7 @@ import org.traccar.BaseProtocolEncoder;
 import org.traccar.Protocol;
 import org.traccar.config.Keys;
 import org.traccar.helper.DataConverter;
+import org.traccar.helper.DateUtil;
 import org.traccar.helper.model.AttributeUtil;
 import org.traccar.model.Command;
 
@@ -29,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Set;
+import java.util.TimeZone;
 
 public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
 
@@ -45,6 +47,32 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         data.writeByte(channel);
         data.writeByte(0); // audio and video
         data.writeByte(0); // main stream
+    }
+
+    // Cameras index SD-card recordings in their own local time, so the video
+    // list / playback commands must send timestamps in that zone, matching
+    // HuabaoProtocolDecoder's decode of the 0x1205 reply (decoder.timezone,
+    // default GMT+8).
+    private TimeZone videoTimeZone(long deviceId) {
+        String name = AttributeUtil.lookup(getCacheManager(), Keys.DECODER_TIMEZONE, deviceId);
+        return TimeZone.getTimeZone(name != null ? name : "GMT+8");
+    }
+
+    private static void writeVideoDate(ByteBuf data, String value, TimeZone timeZone) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyMMddHHmmss");
+        dateFormat.setTimeZone(timeZone);
+        data.writeBytes(DataConverter.parseHex(dateFormat.format(DateUtil.parseDate(value))));
+    }
+
+    static void encodeVideoListData(
+            ByteBuf data, int channel, String startTime, String endTime, long alarmFlag, TimeZone timeZone) {
+        data.writeByte(channel); // logical channel, 0 = all channels
+        writeVideoDate(data, startTime, timeZone);
+        writeVideoDate(data, endTime, timeZone);
+        data.writeLong(alarmFlag); // 0 = all alarm types, otherwise a JT/T 1078 alarm bitmask
+        data.writeByte(2); // audio and video
+        data.writeByte(0); // all stream types
+        data.writeByte(0); // all storage types
     }
 
     @Override
@@ -128,6 +156,40 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                             command.getInteger(Command.KEY_INDEX));
                     return HuabaoProtocolDecoder.formatMessage(
                             0x7e, HuabaoProtocolDecoder.MSG_VIDEO_REQUEST, id, false, data);
+                case Command.TYPE_VIDEO_STOP:
+                    data.writeByte(command.getInteger(Command.KEY_INDEX));
+                    data.writeByte(0); // close audio and video
+                    data.writeByte(0); // close both audio and video
+                    data.writeByte(0); // main stream
+                    return HuabaoProtocolDecoder.formatMessage(
+                            0x7e, HuabaoProtocolDecoder.MSG_VIDEO_CONTROL, id, false, data);
+                case Command.TYPE_VIDEO_LIST:
+                    encodeVideoListData(
+                            data,
+                            command.getInteger(Command.KEY_INDEX),
+                            command.getString(Command.KEY_START_TIME),
+                            command.getString(Command.KEY_END_TIME),
+                            command.getLong(Command.KEY_ALARM_FLAG),
+                            videoTimeZone(command.getDeviceId()));
+                    return HuabaoProtocolDecoder.formatMessage(
+                            0x7e, HuabaoProtocolDecoder.MSG_VIDEO_LIST, id, false, data);
+                case Command.TYPE_VIDEO_PLAYBACK:
+                    String playbackServer = command.getString(Command.KEY_SERVER);
+                    data.writeByte(playbackServer.length());
+                    data.writeCharSequence(playbackServer, StandardCharsets.US_ASCII);
+                    data.writeShort(command.getInteger(Command.KEY_PORT));
+                    data.writeShort(0); // UDP port
+                    data.writeByte(command.getInteger(Command.KEY_INDEX));
+                    data.writeByte(command.getInteger(Command.KEY_RESOURCE_TYPE));
+                    data.writeByte(command.getInteger(Command.KEY_STREAM_TYPE));
+                    data.writeByte(command.getInteger(Command.KEY_STORAGE_TYPE));
+                    data.writeByte(0); // normal playback
+                    data.writeByte(0); // normal speed
+                    TimeZone playbackTimeZone = videoTimeZone(command.getDeviceId());
+                    writeVideoDate(data, command.getString(Command.KEY_START_TIME), playbackTimeZone);
+                    writeVideoDate(data, command.getString(Command.KEY_END_TIME), playbackTimeZone);
+                    return HuabaoProtocolDecoder.formatMessage(
+                            0x7e, HuabaoProtocolDecoder.MSG_VIDEO_PLAYBACK, id, false, data);
                 default:
                     return null;
             }
