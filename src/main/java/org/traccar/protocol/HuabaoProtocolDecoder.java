@@ -222,6 +222,82 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         return dateBuilder.getDate();
     }
 
+    private static final String[] ADAS_ALARM_TYPES = {
+            null, "forwardCollision", "laneDeparture", "followingDistance", "pedestrianCollision",
+            "frequentLaneChange", "roadSignOverrun", "obstacle",
+    };
+
+    private static final String[] DMS_ALARM_TYPES = {
+            null, "fatigue", "phoneUse", "smoking", "distraction", "driverAbnormal",
+            "handsOffWheel", "driverChange",
+    };
+
+    private void decodeActiveSafety(Position position, ByteBuf buf, boolean adas) {
+
+        // T/JSATL12 active-safety alarm body (0x64 ADAS, 0x65 DSM), 47 bytes.
+        // The additional-info loop resets to the item boundary afterwards, so it
+        // is safe to read only the useful fields.
+        long alarmId = buf.readUnsignedInt();
+        int flag = buf.readUnsignedByte(); // 0 = point event, 1 = start, 2 = end
+        int type = buf.readUnsignedByte();
+        int level = buf.readUnsignedByte();
+
+        String prefix = adas ? "adas" : "dms";
+        position.set(prefix + "Alarm", type);
+        position.set(prefix + "AlarmLevel", level);
+        if (flag == 1) {
+            position.set(prefix + "AlarmFlag", "start");
+        } else if (flag == 2) {
+            position.set(prefix + "AlarmFlag", "end");
+        }
+
+        String[] names = adas ? ADAS_ALARM_TYPES : DMS_ALARM_TYPES;
+        String name = type >= 0 && type < names.length ? names[type] : null;
+        if (name != null) {
+            position.set(prefix + "AlarmType", name);
+        }
+
+        if (adas) {
+            position.set("adasFrontSpeed", buf.readUnsignedByte());
+            position.set("adasFrontDistance", buf.readUnsignedByte());
+            int deviation = buf.readUnsignedByte();
+            if (deviation == 1) {
+                position.set("adasDeviation", "left");
+            } else if (deviation == 2) {
+                position.set("adasDeviation", "right");
+            }
+            buf.skipBytes(2); // road sign type and data
+        } else {
+            int fatigue = buf.readUnsignedByte();
+            if (type == 1 && fatigue > 0) {
+                position.set("fatigueDegree", fatigue);
+            }
+            buf.skipBytes(4); // reserved
+        }
+
+        buf.skipBytes(1 + 2 + 4 + 4 + 6 + 2); // speed, altitude, lat, lon, time, vehicle status
+
+        // Alarm identification number (16 bytes): terminal id (7), time (6),
+        // sequence (1), attachment count (1), reserved (1). The whole block, hex
+        // encoded, is the id the VIDEOUPLOAD / 0x9208 attachment request uses.
+        position.set("alarmIndex", (int) (alarmId & 0xFFFFFFFFL));
+        if (buf.readableBytes() >= 16) {
+            byte[] identifier = new byte[16];
+            buf.readBytes(identifier);
+            position.set("alarmIdentifier", ByteBufUtil.hexDump(identifier));
+            position.set("alarmSequence", identifier[13] & 0xFF);
+            position.set("alarmAttachments", identifier[14] & 0xFF);
+        }
+
+        // One alarm per ADAS/DMS type (dmsFatigue, dmsPhoneUse, adasLaneDeparture...) so
+        // each can have its own alert.
+        if (name != null) {
+            position.addAlarm(prefix + Character.toUpperCase(name.charAt(0)) + name.substring(1));
+        } else {
+            position.addAlarm(Position.ALARM_GENERAL);
+        }
+    }
+
     private Position decodeVideoList(DeviceSession deviceSession, ByteBuf buf) {
         if (buf.readableBytes() < 6) {
             return null;
@@ -837,14 +913,10 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     }
                     break;
                 case 0x64:
-                    buf.readUnsignedInt(); // alarm serial number
-                    buf.readUnsignedByte(); // alarm status
-                    position.set("adasAlarm", buf.readUnsignedByte());
+                    decodeActiveSafety(position, buf, true);
                     break;
                 case 0x65:
-                    buf.readUnsignedInt(); // alarm serial number
-                    buf.readUnsignedByte(); // alarm status
-                    position.set("dmsAlarm", buf.readUnsignedByte());
+                    decodeActiveSafety(position, buf, false);
                     break;
                 case 0x67:
                     stringValue = buf.readCharSequence(8, StandardCharsets.US_ASCII).toString();
