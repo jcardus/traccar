@@ -420,7 +420,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         String server = getConfig().getString(Keys.PROTOCOL_CLIP_SERVER.withPrefix(prefix));
         String username = getConfig().getString(Keys.PROTOCOL_CLIP_USERNAME.withPrefix(prefix));
         String password = getConfig().getString(Keys.PROTOCOL_CLIP_PASSWORD.withPrefix(prefix));
-        if (server == null || username == null || password == null) {
+        // a secret that is not set renders as an empty string in traccar.xml
+        if (server == null || server.isBlank() || username == null || username.isBlank()
+                || password == null || password.isBlank()) {
             return;
         }
         long now = System.currentTimeMillis();
