@@ -78,6 +78,29 @@ public class HuabaoProtocolEncoderTest extends ProtocolTest {
         data.release();
     }
 
+    @Test
+    public void testEncodeVideoUpload() {
+        ByteBuf data = Unpooled.buffer();
+        try {
+            Command command = new Command();
+            command.set(Command.KEY_SERVER, "ftp.example");
+            command.set(Command.KEY_PORT, 21);
+            command.set(Command.KEY_USERNAME, "user");
+            command.set(Command.KEY_PASSWORD, "pass");
+            command.set(Command.KEY_PATH, "/v");
+            command.set(Command.KEY_INDEX, 1);
+            command.set(Command.KEY_START_TIME, "2026-08-31T09:29:16.000Z");
+            command.set(Command.KEY_END_TIME, "2026-08-31T09:29:36.000Z");
+            HuabaoProtocolEncoder.encodeVideoUploadData(data, command, java.util.TimeZone.getTimeZone("UTC"));
+            assertEquals(
+                    "0b6674702e6578616d706c65" + "0015" + "0475736572" + "0470617373" + "022f76"
+                            + "01" + "260831092916" + "260831092936" + "0000000000000000" + "00000001",
+                    ByteBufUtil.hexDump(data));
+        } finally {
+            data.release();
+        }
+    }
+
     @Disabled
     @Test
     public void testEncode() throws Exception {
