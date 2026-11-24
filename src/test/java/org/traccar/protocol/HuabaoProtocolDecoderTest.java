@@ -12,9 +12,27 @@ public class HuabaoProtocolDecoderTest extends ProtocolTest {
 
     @Test
     public void testClipPath() {
-        assertEquals("/062996769808/2-1000-2000-3000/",
-                HuabaoProtocolDecoder.clipPath("062996769808", 2, 1000, 2000, 3000));
-        assertEquals("/a_b/1-1-2-3/", HuabaoProtocolDecoder.clipPath("a b", 1, 1, 2, 3));
+        assertEquals("/062996769808/2-1000-2000-3000-fatigue/",
+                HuabaoProtocolDecoder.clipPath("062996769808", 2, 1000, 2000, 3000, "fatigue"));
+        assertEquals("/a_b/1-1-2-3-adas52/", HuabaoProtocolDecoder.clipPath("a b", 1, 1, 2, 3, "adas-52!"));
+    }
+
+    @Test
+    public void testAlarmType() {
+        var named = new Position();
+        named.set("dmsAlarmType", "seatBelt");
+        assertEquals("seatBelt", HuabaoProtocolDecoder.alarmType(named));
+        var road = new Position();
+        road.set("adasAlarmType", "followingDistance");
+        assertEquals("followingDistance", HuabaoProtocolDecoder.alarmType(road));
+        var cabin = new Position();
+        cabin.set("dmsAlarm", 60);
+        cabin.set("vendorAlarmCode", 60);
+        assertEquals("dms60", HuabaoProtocolDecoder.alarmType(cabin));
+        var unnamedRoad = new Position();
+        unnamedRoad.set("adasAlarm", 52);
+        unnamedRoad.set("vendorAlarmCode", 52);
+        assertEquals("adas52", HuabaoProtocolDecoder.alarmType(unnamedRoad));
     }
 
     @Test
