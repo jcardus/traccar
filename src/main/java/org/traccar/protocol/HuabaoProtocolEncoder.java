@@ -36,6 +36,17 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
         super(protocol);
     }
 
+    static void encodeVideoRequestData(ByteBuf data, String server, int port, int channel) {
+        byte[] serverBytes = server.getBytes(StandardCharsets.US_ASCII);
+        data.writeByte(serverBytes.length);
+        data.writeBytes(serverBytes);
+        data.writeShort(port); // TCP media port
+        data.writeShort(port); // UDP media port
+        data.writeByte(channel);
+        data.writeByte(1); // video
+        data.writeByte(0); // main stream
+    }
+
     @Override
     protected Object encodeCommand(Command command) {
 
@@ -109,6 +120,14 @@ public class HuabaoProtocolEncoder extends BaseProtocolEncoder {
                         return HuabaoProtocolDecoder.formatMessage(
                                 0x7e, HuabaoProtocolDecoder.MSG_TERMINAL_CONTROL, id, false, data);
                     }
+                case Command.TYPE_VIDEO_START:
+                    encodeVideoRequestData(
+                            data,
+                            command.getString(Command.KEY_SERVER),
+                            command.getInteger(Command.KEY_PORT),
+                            command.getInteger(Command.KEY_INDEX));
+                    return HuabaoProtocolDecoder.formatMessage(
+                            0x7e, HuabaoProtocolDecoder.MSG_VIDEO_REQUEST, id, false, data);
                 default:
                     return null;
             }
