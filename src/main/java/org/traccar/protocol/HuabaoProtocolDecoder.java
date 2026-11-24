@@ -298,6 +298,37 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
+    // Vendor alarm extension 0xA5 seen on a Hikvision camera (no T/JSATL12 0x64/0x65 items):
+    // alarm id (4), flag (1), type (1), level (1), reserved (1), speed (1), altitude (2), latitude (4),
+    // longitude (4), time (6), vehicle status (2), identifier string (1 length + ASCII), then an
+    // undocumented tail that is kept as hex. The alarm type meanings are not known yet, so the raw
+    // numbers are exposed.
+    private void decodeVendorAlarm(Position position, ByteBuf buf, int length) {
+        if (length < 28) {
+            return;
+        }
+        int endIndex = buf.readerIndex() + length;
+        position.set("alarmIndex", (int) buf.readUnsignedInt());
+        int flag = buf.readUnsignedByte(); // 0 = point event, 1 = start, 2 = end
+        position.set("vendorAlarmType", buf.readUnsignedByte());
+        position.set("vendorAlarmLevel", buf.readUnsignedByte());
+        buf.skipBytes(1 + 1 + 2 + 4 + 4 + 6 + 2); // reserved, speed, altitude, lat, lon, time, vehicle status
+        if (flag == 1) {
+            position.set("vendorAlarmFlag", "start");
+        } else if (flag == 2) {
+            position.set("vendorAlarmFlag", "end");
+        }
+        int idLength = buf.readUnsignedByte();
+        if (buf.readerIndex() + idLength <= endIndex) {
+            position.set("vendorAlarmId", buf.readCharSequence(idLength, StandardCharsets.US_ASCII).toString());
+            if (buf.readerIndex() < endIndex) {
+                position.set("vendorAlarmInfo",
+                        ByteBufUtil.hexDump(buf, buf.readerIndex(), endIndex - buf.readerIndex()));
+            }
+        }
+        position.addAlarm(Position.ALARM_GENERAL);
+    }
+
     private Position decodeVideoList(DeviceSession deviceSession, ByteBuf buf) {
         if (buf.readableBytes() < 6) {
             return null;
@@ -845,6 +876,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     break;
                 case 0x25:
                     position.set(Position.KEY_INPUT, buf.readUnsignedInt());
+                    break;
+                case 0xA5:
+                    decodeVendorAlarm(position, buf, length);
                     break;
                 case 0x2B:
                 case 0xA7:
