@@ -356,9 +356,17 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         String prefix = extension == 0xA5 ? "dms" : "adas";
         position.set(prefix + "Alarm", code);
         position.set(prefix + "AlarmLevel", position.getInteger("vendorAlarmLevel"));
-        if (extension == 0xA5 && code == 67) { // confirmed on video: driver yawning with eyes shut
-            position.set("dmsAlarmType", "fatigue");
-            return "dmsFatigue";
+        if (extension == 0xA5) { // cabin camera codes confirmed on video
+            String name = switch (code) {
+                case 61 -> "phoneUse"; // driver on the phone
+                case 66 -> "seatBelt"; // no belt across the driver
+                case 67 -> "fatigue"; // yawning with eyes shut
+                default -> null;
+            };
+            if (name != null) {
+                position.set("dmsAlarmType", name);
+                return "dms" + Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            }
         }
         return Position.ALARM_GENERAL;
     }
