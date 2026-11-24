@@ -1,11 +1,25 @@
 package org.traccar.protocol;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.traccar.ProtocolTest;
 import org.traccar.model.Command;
 
 public class HuabaoProtocolEncoderTest extends ProtocolTest {
+
+    @Test
+    public void testEncodeVideoRequestData() {
+        var data = Unpooled.buffer();
+        HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1);
+        assertEquals(
+                "126d656469612d69702e6e2d6770732e636f6d27122712010100",
+                ByteBufUtil.hexDump(data));
+        data.release();
+    }
 
     @Disabled
     @Test

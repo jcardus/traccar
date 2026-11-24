@@ -19,6 +19,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.helper.BufferUtil;
 import org.traccar.model.WifiAccessPoint;
@@ -48,8 +50,15 @@ import java.util.TimeZone;
 
 public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(HuabaoProtocolDecoder.class);
+
     public HuabaoProtocolDecoder(Protocol protocol) {
         super(protocol);
+    }
+
+    private static String hex(ByteBuf buf, int index, int length) {
+        int safeLength = Math.max(0, Math.min(length, buf.writerIndex() - index));
+        return ByteBufUtil.hexDump(buf, index, safeLength);
     }
 
     public static final int MSG_TERMINAL_GENERAL_RESPONSE = 0x0001;
@@ -60,6 +69,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_TERMINAL_REGISTER = 0x0100;
     public static final int MSG_TERMINAL_REGISTER_RESPONSE = 0x8100;
     public static final int MSG_TERMINAL_CONTROL = 0x8105;
+    public static final int MSG_VIDEO_REQUEST = 0x9101;
     public static final int MSG_TERMINAL_AUTH = 0x0102;
     public static final int MSG_LOCATION_REPORT = 0x0200;
     public static final int MSG_LOCATION_BATCH_2 = 0x0210;
@@ -128,8 +138,10 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         }
     }
 
-    private void decodeAlarm(Position position, String model, long value) {
+    private void decodeAlarm(DeviceSession deviceSession, Position position, String model, long value) {
+        long parsedMask;
         if (model != null && Set.of("G-360P", "G-508P").contains(model)) {
+            parsedMask = (1L << 0) | (1L << 1) | (1L << 4);
             if (BitUtil.check(value, 0) || BitUtil.check(value, 4)) {
                 position.addAlarm(Position.ALARM_REMOVING);
             }
@@ -137,10 +149,14 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 position.addAlarm(Position.ALARM_TAMPERING);
             }
         } else if (model != null && Set.of("AL300", "GL100").contains(model)) {
+            parsedMask = 1L << 16;
             if (BitUtil.check(value, 16)) {
                 position.addAlarm(Position.ALARM_MOVEMENT);
             }
         } else {
+            parsedMask = (1L << 0) | (1L << 1) | (1L << 4) | (1L << 5) | (1L << 7) | (1L << 8)
+                    | (1L << 9) | (1L << 10) | (1L << 11) | (1L << 15) | (1L << 16) | (1L << 17)
+                    | (1L << 18) | (1L << 20) | (1L << 28);
             if (BitUtil.check(value, 0)) {
                 position.addAlarm(Position.ALARM_SOS);
             }
@@ -172,11 +188,17 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             if (BitUtil.check(value, 28)) {
                 position.addAlarm(Position.ALARM_MOVEMENT);
             }
-            if (BitUtil.check(value, 29) || BitUtil.check(value, 30)) {
-                if (model == null || !model.equals("VL300")) {
+            if (model == null || !model.equals("VL300")) {
+                parsedMask |= (1L << 29) | (1L << 30);
+                if (BitUtil.check(value, 29) || BitUtil.check(value, 30)) {
                     position.addAlarm(Position.ALARM_ACCIDENT);
                 }
             }
+        }
+        long unparsed = value & ~parsedMask;
+        if (unparsed != 0) {
+            LOGGER.warn("Huabao [{}] unparsed alarm bits {} (raw {})",
+                    deviceSession.getUniqueId(), String.format("0x%08x", unparsed), String.format("0x%08x", value));
         }
     }
 
@@ -287,11 +309,22 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             return null;
         }
 
+        if (type != MSG_LOCATION_REPORT_2 && type != MSG_LOCATION_REPORT_BLIND && (attribute & 0xfc00) != 0) {
+            LOGGER.warn("Huabao [{}] unparsed header attribute {} in message {}: {}",
+                    deviceSession.getUniqueId(), String.format("0x%04x", attribute), String.format("0x%04x", type),
+                    hex(buf, 0, buf.writerIndex()));
+        }
+
         if (!deviceSession.contains(DeviceSession.KEY_TIMEZONE)) {
             deviceSession.set(DeviceSession.KEY_TIMEZONE, getTimeZone(deviceSession.getDeviceId(), "GMT+8"));
         }
 
         if (type == MSG_TERMINAL_REGISTER) {
+
+            if (buf.readableBytes() > 2) {
+                LOGGER.warn("Huabao [{}] unparsed register 0x0100 body: {}",
+                        deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
+            }
 
             if (channel != null) {
                 ByteBuf response = Unpooled.buffer();
@@ -332,10 +365,24 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 position.set(Position.KEY_RSSI, buf.readUnsignedByte());
                 position.set(Position.KEY_STATUS, buf.readUnsignedByte());
 
+                if (buf.readableBytes() > 2) {
+                    LOGGER.warn("Huabao [{}] unparsed heartbeat 0x0002 trailing data: {}",
+                            deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
+                }
+
                 return position;
+            } else if (buf.readableBytes() > 2) {
+                LOGGER.warn("Huabao [{}] unparsed heartbeat 0x0002 body: {}",
+                        deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
             }
 
         } else if (type == MSG_TERMINAL_AUTH || type == MSG_HEARTBEAT_2 || type == MSG_PHOTO) {
+
+            if (buf.readableBytes() > 2) {
+                LOGGER.warn("Huabao [{}] unparsed message {} body: {}",
+                        deviceSession.getUniqueId(), String.format("0x%04x", type),
+                        hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
+            }
 
             sendGeneralResponse(channel, remoteAddress, id, type, index);
 
@@ -421,22 +468,41 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
         } else if (type == MSG_DRIVER_IDENTITY) {
 
-            Position position = new Position(getProtocolName());
-            position.setDeviceId(deviceSession.getDeviceId());
+            int startIndex = buf.readerIndex();
+            int bodyLength = Math.max(0, buf.readableBytes() - 2);
+            try {
+                Position position = new Position(getProtocolName());
+                position.setDeviceId(deviceSession.getDeviceId());
 
-            getLastLocation(position, null);
+                getLastLocation(position, null);
 
-            position.set("cardStatus", buf.readUnsignedByte());
+                position.set("cardStatus", buf.readUnsignedByte());
 
-            position.setDeviceTime(readDate(buf, deviceSession.get(DeviceSession.KEY_TIMEZONE)));
+                position.setDeviceTime(readDate(buf, deviceSession.get(DeviceSession.KEY_TIMEZONE)));
 
-            position.set("cardResult", buf.readUnsignedByte());
-            position.set("driver", buf.readString(buf.readUnsignedByte(), StandardCharsets.US_ASCII));
-            position.set("cardCode", buf.readString(20, StandardCharsets.US_ASCII).trim());
-            position.set("cardAgency", buf.readString(buf.readUnsignedByte(), StandardCharsets.US_ASCII));
-            position.set("cardValidity", ByteBufUtil.hexDump(buf.readSlice(4)));
+                position.set("cardResult", buf.readUnsignedByte());
+                position.set("driver", buf.readString(buf.readUnsignedByte(), StandardCharsets.US_ASCII));
+                position.set("cardCode", buf.readString(20, StandardCharsets.US_ASCII).trim());
+                position.set("cardAgency", buf.readString(buf.readUnsignedByte(), StandardCharsets.US_ASCII));
+                position.set("cardValidity", ByteBufUtil.hexDump(buf.readSlice(4)));
 
-            return position;
+                if (buf.readableBytes() > 2) {
+                    LOGGER.warn("Huabao [{}] unparsed 0x0702 trailing data: {}",
+                            deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
+                }
+
+                return position;
+            } catch (RuntimeException e) {
+                LOGGER.warn("Huabao [{}] unparsed 0x0702 driver identity ({}): {}",
+                        deviceSession.getUniqueId(), e.getMessage(), hex(buf, startIndex, bodyLength));
+                return null;
+            }
+
+        } else {
+
+            LOGGER.warn("Huabao [{}] unparsed message {}: {}",
+                    deviceSession.getUniqueId(), String.format("0x%04x", type),
+                    hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
 
         }
 
@@ -455,7 +521,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         return null;
     }
 
-    private void decodeExtension(Position position, ByteBuf buf, int endIndex) {
+    private void decodeExtension(DeviceSession deviceSession, Position position, ByteBuf buf, int endIndex) {
         while (buf.readerIndex() < endIndex) {
             int type = buf.readUnsignedByte();
             int length = buf.readUnsignedByte();
@@ -492,7 +558,12 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0xCC -> {
                     position.set(Position.KEY_ICCID, buf.readCharSequence(20, StandardCharsets.US_ASCII).toString());
                 }
-                default -> buf.skipBytes(length);
+                default -> {
+                    LOGGER.warn("Huabao [{}] unparsed 0x80 extension {}: {}",
+                            deviceSession.getUniqueId(), String.format("0x%02x", type),
+                            hex(buf, buf.readerIndex(), length));
+                    buf.skipBytes(length);
+                }
             }
         }
     }
@@ -545,7 +616,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
         String model = getDeviceModel(deviceSession);
 
-        decodeAlarm(position, model, buf.readUnsignedInt());
+        decodeAlarm(deviceSession, position, model, buf.readUnsignedInt());
 
         decodeCoordinates(position, deviceSession, buf);
 
@@ -555,6 +626,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         position.setTime(readDate(buf, deviceSession.get(DeviceSession.KEY_TIMEZONE)));
 
         if (buf.readableBytes() == 20) {
+
+            LOGGER.warn("Huabao [{}] location 20-byte fixed extension branch: {}",
+                    deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), 18));
 
             buf.skipBytes(4); // remaining battery and mileage
             position.set(Position.KEY_ODOMETER, buf.readUnsignedInt() * 1000);
@@ -572,7 +646,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
             int subtype = buf.readUnsignedByte();
             int length = buf.readUnsignedByte();
-            int endIndex = buf.readerIndex() + length;
+            int valueIndex = buf.readerIndex();
+            int endIndex = valueIndex + length;
             String stringValue;
             int event;
             switch (subtype) {
@@ -626,6 +701,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         if (stringValue.startsWith("*M00")) {
                             String lockStatus = stringValue.substring(8, 8 + 7);
                             position.set(Position.KEY_BATTERY, Integer.parseInt(lockStatus.substring(2, 5)) * 0.01);
+                        } else {
+                            LOGGER.warn("Huabao [{}] unparsed location extension 0x33: {}",
+                                    deviceSession.getUniqueId(), hex(buf, valueIndex, length));
                         }
                     }
                     break;
@@ -641,6 +719,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 }
                             }
                         }
+                    } else {
+                        LOGGER.warn("Huabao [{}] unparsed location extension 0x51: {}",
+                                deviceSession.getUniqueId(), hex(buf, valueIndex, length));
                     }
                     break;
                 case 0x56:
@@ -693,11 +774,15 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0x70:
                     buf.readUnsignedInt(); // alarm serial number
                     buf.readUnsignedByte(); // alarm status
-                    switch (buf.readUnsignedByte()) {
+                    int behaviorAlarm = buf.readUnsignedByte();
+                    switch (behaviorAlarm) {
                         case 0x01 -> position.addAlarm(Position.ALARM_ACCELERATION);
                         case 0x02 -> position.addAlarm(Position.ALARM_BRAKING);
                         case 0x03 -> position.addAlarm(Position.ALARM_CORNERING);
                         case 0x16 -> position.addAlarm(Position.ALARM_ACCIDENT);
+                        default -> LOGGER.warn("Huabao [{}] unparsed 0x70 alarm {}: {}",
+                                deviceSession.getUniqueId(), String.format("0x%02x", behaviorAlarm),
+                                hex(buf, valueIndex, length));
                     }
                     break;
                 case 0x68:
@@ -718,7 +803,7 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0x80:
                     buf.readUnsignedByte(); // content
                     endIndex = buf.writerIndex() - 2;
-                    decodeExtension(position, buf, endIndex);
+                    decodeExtension(deviceSession, position, buf, endIndex);
                     break;
                 case 0x82:
                     position.set(Position.KEY_POWER, buf.readUnsignedShort() / 10.0);
@@ -859,10 +944,16 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                     position.set("externalTemp", buf.readUnsignedShort() / 10.0 - 50);
                                     break;
                                 default:
+                                    LOGGER.warn("Huabao [{}] unparsed 0xea extension {}: {}",
+                                            deviceSession.getUniqueId(), String.format("0x%02x", extendedType),
+                                            hex(buf, buf.readerIndex(), extendedLength));
                                     break;
                             }
                             buf.readerIndex(extendedEndIndex);
                         }
+                    } else {
+                        LOGGER.warn("Huabao [{}] unparsed location extension 0xea: {}",
+                                deviceSession.getUniqueId(), hex(buf, valueIndex, length));
                     }
                     break;
                 case 0xEB:
@@ -926,6 +1017,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                     position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
                                     break;
                                 default:
+                                    LOGGER.warn("Huabao [{}] unparsed 0xeb extension {}: {}",
+                                            deviceSession.getUniqueId(), String.format("0x%04x", extendedType),
+                                            hex(buf, buf.readerIndex(), extendedEndIndex - buf.readerIndex()));
                                     break;
                             }
                             buf.readerIndex(extendedEndIndex);
@@ -977,7 +1071,12 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                             case 0x0112 -> position.set("hardAccelerationCount", buf.readUnsignedShort());
                             case 0x0113 -> position.set("hardDecelerationCount", buf.readUnsignedShort());
                             case 0x0114 -> position.set("hardCorneringCount", buf.readUnsignedShort());
-                            default -> buf.skipBytes(extendedLength);
+                            default -> {
+                                LOGGER.warn("Huabao [{}] unparsed 0xf3 extension {}: {}",
+                                        deviceSession.getUniqueId(), String.format("0x%04x", extendedType),
+                                        hex(buf, buf.readerIndex(), extendedLength));
+                                buf.skipBytes(extendedLength);
+                            }
                         }
                     }
                     break;
@@ -991,6 +1090,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0xF5:
                     if (length == 2) {
                         position.set("illuminance", buf.readUnsignedShort());
+                    } else {
+                        LOGGER.warn("Huabao [{}] unparsed location extension 0xf5: {}",
+                                deviceSession.getUniqueId(), hex(buf, valueIndex, length));
                     }
                     break;
                 case 0xF6:
@@ -1070,14 +1172,23 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                         position.addAlarm(Position.ALARM_TAMPERING);
                                     }
                                 } else {
+                                    LOGGER.warn("Huabao [{}] unparsed 0xfe extension {}: {}",
+                                            deviceSession.getUniqueId(), String.format("0x%02x", extendedType),
+                                            hex(buf, buf.readerIndex(), extendedLength));
                                     buf.skipBytes(extendedLength);
                                 }
                             }
+                        } else {
+                            LOGGER.warn("Huabao [{}] unparsed location extension 0xfe: {}",
+                                    deviceSession.getUniqueId(), hex(buf, valueIndex, length));
                         }
                         position.set(Position.KEY_BATTERY_LEVEL, buf.readUnsignedByte());
                     }
                     break;
                 default:
+                    LOGGER.warn("Huabao [{}] unparsed location extension {}: {}",
+                            deviceSession.getUniqueId(), String.format("0x%02x", subtype),
+                            hex(buf, valueIndex, length));
                     break;
             }
             buf.readerIndex(endIndex);
@@ -1161,6 +1272,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         buf.readUnsignedShort(); // mcc
                         buf.readUnsignedByte(); // mnc
                     } else {
+                        LOGGER.warn("Huabao [{}] unparsed location2 extension 0x0a: {}",
+                                deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), length));
                         buf.skipBytes(length);
                     }
                     break;
@@ -1194,6 +1307,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     position.set(Position.KEY_GEOFENCE, buf.readUnsignedByte());
                     break;
                 default:
+                    LOGGER.warn("Huabao [{}] unparsed location2 extension {}: {}",
+                            deviceSession.getUniqueId(), String.format("0x%02x", id),
+                            hex(buf, buf.readerIndex(), length));
                     buf.skipBytes(length);
                     break;
             }
@@ -1306,7 +1422,12 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                     case 1 -> position.set(Position.PREFIX_IO + id, buf.readUnsignedByte());
                                     case 2 -> position.set(Position.PREFIX_IO + id, buf.readUnsignedShort());
                                     case 4 -> position.set(Position.PREFIX_IO + id, buf.readUnsignedInt());
-                                    default -> buf.skipBytes(length);
+                                    default -> {
+                                        LOGGER.warn("Huabao [{}] unparsed transparent 0xf0/0x01 id {}: {}",
+                                                deviceSession.getUniqueId(), String.format("0x%04x", id),
+                                                hex(buf, buf.readerIndex(), length));
+                                        buf.skipBytes(length);
+                                    }
                                 }
                             }
                         }
@@ -1372,6 +1493,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                                 position.addAlarm(Position.ALARM_DOOR);
                                 break;
                             default:
+                                LOGGER.warn("Huabao [{}] unparsed transparent 0xf0/0x03 alarm {}: {}",
+                                        deviceSession.getUniqueId(), String.format("0x%02x", id),
+                                        hex(buf, buf.readerIndex(), length));
                                 break;
                         }
                         buf.skipBytes(length);
@@ -1399,6 +1523,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                     getLastLocation(position, time);
                     break;
                 default:
+                    LOGGER.warn("Huabao [{}] unparsed transparent 0xf0 subtype {}: {}",
+                            deviceSession.getUniqueId(), String.format("0x%02x", subtype),
+                            hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
                     return null;
             }
 
@@ -1417,9 +1544,18 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             position.setSpeed(UnitsConverter.knotsFromKph(buf.readUnsignedShort() * 0.1));
             position.setCourse(buf.readUnsignedShort());
 
-            // TODO more positions and g sensor data
+            if (buf.readableBytes() > 2) {
+                LOGGER.warn("Huabao [{}] unparsed transparent 0xff trailing data: {}",
+                        deviceSession.getUniqueId(), hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
+            }
 
             return position;
+
+        } else {
+
+            LOGGER.warn("Huabao [{}] unparsed transparent type {}: {}",
+                    deviceSession.getUniqueId(), String.format("0x%02x", type),
+                    hex(buf, buf.readerIndex(), buf.readableBytes() - 2));
 
         }
 
