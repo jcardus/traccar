@@ -834,6 +834,15 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0x14:
                     position.set("videoAlarm", buf.readUnsignedInt());
                     break;
+                case 0x15:
+                    position.set("videoSignalLoss", buf.readUnsignedInt());
+                    break;
+                case 0x16:
+                    position.set("videoSignalOcclusion", buf.readUnsignedInt());
+                    break;
+                case 0x17:
+                    position.set("storageFault", buf.readUnsignedShort());
+                    break;
                 case 0x25:
                     position.set(Position.KEY_INPUT, buf.readUnsignedInt());
                     break;
