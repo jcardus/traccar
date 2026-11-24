@@ -1,10 +1,32 @@
 package org.traccar.protocol;
 
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.traccar.ProtocolTest;
 import org.traccar.model.Position;
 
 public class HuabaoProtocolDecoderTest extends ProtocolTest {
+
+    @Test
+    public void testClipPath() {
+        assertEquals("/062996769808/2-1000-2000-3000/",
+                HuabaoProtocolDecoder.clipPath("062996769808", 2, 1000, 2000, 3000));
+        assertEquals("/a_b/1-1-2-3/", HuabaoProtocolDecoder.clipPath("a b", 1, 1, 2, 3));
+    }
+
+    @Test
+    public void testAllowClip() {
+        var history = new java.util.LinkedList<Long>();
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_000_000L, 60, 3));
+        assertFalse(HuabaoProtocolDecoder.allowClip(history, 1_030_000L, 60, 3)); // too soon
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_070_000L, 60, 3));
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_140_000L, 60, 3));
+        assertFalse(HuabaoProtocolDecoder.allowClip(history, 1_210_000L, 60, 3)); // hourly cap
+        assertTrue(HuabaoProtocolDecoder.allowClip(history, 1_000_000L + 3_700_000L, 60, 3)); // a new hour
+    }
 
     @Test
     public void testDecodeG40Alarm() throws Exception {
