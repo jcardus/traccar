@@ -16,7 +16,7 @@ public class HuabaoProtocolEncoderTest extends ProtocolTest {
         var data = Unpooled.buffer();
         HuabaoProtocolEncoder.encodeVideoRequestData(data, "media-ip.n-gps.com", 10002, 1);
         assertEquals(
-                "126d656469612d69702e6e2d6770732e636f6d27122712010100",
+                "126d656469612d69702e6e2d6770732e636f6d27122712010000",
                 ByteBufUtil.hexDump(data));
         data.release();
     }
