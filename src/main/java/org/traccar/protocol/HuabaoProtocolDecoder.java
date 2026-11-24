@@ -73,6 +73,8 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
     public static final int MSG_VIDEO_CONTROL = 0x9102;
     public static final int MSG_VIDEO_PLAYBACK = 0x9201;
     public static final int MSG_VIDEO_LIST = 0x9205;
+    public static final int MSG_VIDEO_UPLOAD = 0x9206;
+    public static final int MSG_VIDEO_UPLOAD_COMPLETE = 0x1206;
     public static final int MSG_VIDEO_LIST_RESPONSE = 0x1205;
     public static final int MSG_TERMINAL_AUTH = 0x0102;
     public static final int MSG_LOCATION_REPORT = 0x0200;
@@ -338,6 +340,14 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         position.addAlarm(Position.ALARM_GENERAL);
     }
 
+    private static boolean isVideoResponse(int responseType) {
+        return responseType == MSG_VIDEO_REQUEST
+                || responseType == MSG_VIDEO_CONTROL
+                || responseType == MSG_VIDEO_PLAYBACK
+                || responseType == MSG_VIDEO_LIST
+                || responseType == MSG_VIDEO_UPLOAD;
+    }
+
     private Position decodeVideoList(DeviceSession deviceSession, ByteBuf buf) {
         if (buf.readableBytes() < 6) {
             return null;
@@ -529,6 +539,37 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 channel.writeAndFlush(new NetworkMessage(
                         formatMessage(delimiter, MSG_TERMINAL_REGISTER_RESPONSE, id, false, response), remoteAddress));
             }
+
+        } else if (type == MSG_TERMINAL_GENERAL_RESPONSE && buf.readableBytes() >= 5 + 2 && isVideoResponse(
+                buf.getUnsignedShort(buf.readerIndex() + 2))) {
+
+            buf.readUnsignedShort(); // response serial number
+            int responseType = buf.readUnsignedShort();
+            int result = buf.readUnsignedByte();
+
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            getLastLocation(position, null);
+            String commandType = String.format("0x%04X", responseType);
+            position.set(
+                    Position.KEY_RESULT,
+                    result == RESULT_SUCCESS ? commandType + " accepted" : commandType + " rejected: " + result);
+            return position;
+
+        } else if (type == MSG_VIDEO_UPLOAD_COMPLETE) {
+
+            buf.readUnsignedShort(); // response serial number
+            int result = buf.readUnsignedByte();
+
+            sendGeneralResponse(channel, remoteAddress, id, type, index);
+
+            Position position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+            getLastLocation(position, null);
+            position.set(
+                    Position.KEY_RESULT,
+                    result == 0 ? "0x9206 upload completed" : "0x9206 upload failed: " + result);
+            return position;
 
         } else if (type == MSG_REPORT_TEXT_MESSAGE) {
 

@@ -64,6 +64,7 @@ public class Command extends BaseCommand {
     public static final String TYPE_VIDEO_STOP = "videoStop";
     public static final String TYPE_VIDEO_LIST = "videoList";
     public static final String TYPE_VIDEO_PLAYBACK = "videoPlayback";
+    public static final String TYPE_VIDEO_UPLOAD = "videoUpload";
 
     public static final String TYPE_ALARM_GEOFENCE = "alarmGeofence";
     public static final String TYPE_ALARM_BATTERY = "alarmBattery";
@@ -94,6 +95,10 @@ public class Command extends BaseCommand {
     public static final String KEY_STREAM_TYPE = "streamType";
     public static final String KEY_STORAGE_TYPE = "storageType";
     public static final String KEY_DATA_TYPE = "dataType";
+    public static final String KEY_USERNAME = "username";
+    public static final String KEY_PASSWORD = "password";
+    public static final String KEY_PATH = "path";
+    public static final String KEY_NETWORK_CONDITION = "networkCondition";
     public static final String KEY_NO_QUEUE = "noQueue";
 
     @QueryIgnore
