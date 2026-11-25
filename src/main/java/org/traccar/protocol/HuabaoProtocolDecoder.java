@@ -373,10 +373,12 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         } else if (extension == 0xA4 && code == 84) {
             name = "followingDistance"; // a car close ahead at speed, on both occasions seen on video
         } else if (extension == 0xA8 && (code == 51 || code == 52)) {
-            // harsh braking (identified by the owner from the clips: 52 certain, 51 looks like it), a standard
-            // Traccar alarm so events and notifications work
-            position.set(prefix + "AlarmType", "harshBraking");
-            return Position.ALARM_BRAKING;
+            // driving behavior, standard Traccar alarms so events and notifications work. Read from the vehicle
+            // speed on the camera video around each alarm: 51 (3 of 3) climbs 20 to 40 km/h in 4 s, 52 (4 of 4)
+            // collapses to a near stop.
+            boolean braking = code == 52;
+            position.set(prefix + "AlarmType", braking ? "harshBraking" : "harshAcceleration");
+            return braking ? Position.ALARM_BRAKING : Position.ALARM_ACCELERATION;
         }
         if (name != null) {
             position.set(prefix + "AlarmType", name);
