@@ -372,8 +372,9 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             };
         } else if (extension == 0xA4 && code == 84) {
             name = "followingDistance"; // a car close ahead at speed, on both occasions seen on video
-        } else if (extension == 0xA8 && code == 52) {
-            // harsh braking (identified by the owner), a standard Traccar alarm so events and notifications work
+        } else if (extension == 0xA8 && (code == 51 || code == 52)) {
+            // harsh braking (identified by the owner from the clips: 52 certain, 51 looks like it), a standard
+            // Traccar alarm so events and notifications work
             position.set(prefix + "AlarmType", "harshBraking");
             return Position.ALARM_BRAKING;
         }
