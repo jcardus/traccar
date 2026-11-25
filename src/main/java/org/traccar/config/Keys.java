@@ -384,6 +384,14 @@ public final class Keys {
             20);
 
     /**
+     * Seconds to wait before asking the camera for the clip, so the footage after the alarm has been recorded.
+     */
+    public static final ConfigSuffix<Integer> PROTOCOL_CLIP_DELAY = new IntegerConfigSuffix(
+            ".clip.delay",
+            List.of(KeyType.CONFIG, KeyType.DEVICE),
+            40);
+
+    /**
      * Minimum seconds between two clip requests to the same device.
      */
     public static final ConfigSuffix<Integer> PROTOCOL_CLIP_INTERVAL = new IntegerConfigSuffix(
