@@ -7,6 +7,18 @@ import org.traccar.model.Position;
 public class HuabaoProtocolDecoderTest extends ProtocolTest {
 
     @Test
+    public void testNetworkType() throws Exception {
+
+        var decoder = inject(new HuabaoProtocolDecoder(null));
+
+        // 0xE8 status block 0x2005 / 0x0006 = networkType (here 4 = 4G)
+        verifyAttribute(decoder, binary(
+                "7e020000504eb6fb4ad6281812000000000004000f000000000000000000190327008926102712304601040003e8fd30011531011015040000000017020000eb095554432d30333a3030e81120050e20010201180006010400070200066a7e"),
+                "networkType", 4);
+
+    }
+
+    @Test
     public void testDecode() throws Exception {
 
         var decoder = inject(new HuabaoProtocolDecoder(null));
