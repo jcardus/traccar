@@ -50,6 +50,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.concurrent.TimeUnit;
 
 public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
 
@@ -484,10 +485,14 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
         HuabaoProtocolEncoder.encodeVideoUploadData(data, command, deviceSession.get(DeviceSession.KEY_TIMEZONE));
         // sendGeneralResponse has consumed `id`, so use a copy of its bytes
         ByteBuf terminal = Unpooled.wrappedBuffer(ByteBufUtil.getBytes(id, 0, id.writerIndex()));
-        channel.writeAndFlush(new NetworkMessage(
-                formatMessage(delimiter, MSG_VIDEO_UPLOAD, terminal, false, data), remoteAddress));
-        LOGGER.info("Huabao [{}] alarm clip requested channel={} code={} path={}",
-                deviceSession.getUniqueId(), cameraChannel, position.getInteger("vendorAlarmCode"), path);
+        ByteBuf request = formatMessage(delimiter, MSG_VIDEO_UPLOAD, terminal, false, data);
+        // the window runs past the alarm, and the camera can only upload what it has already recorded, so ask once
+        // the window is over (a request at the alarm gave a 6 s clip of a 35 s window)
+        int delay = getConfig().getInteger(Keys.PROTOCOL_CLIP_DELAY.withPrefix(prefix));
+        channel.eventLoop().schedule(
+                () -> channel.writeAndFlush(new NetworkMessage(request, remoteAddress)), delay, TimeUnit.SECONDS);
+        LOGGER.info("Huabao [{}] alarm clip requested in {} s channel={} code={} path={}",
+                deviceSession.getUniqueId(), delay, cameraChannel, position.getInteger("vendorAlarmCode"), path);
     }
 
     private Position decodeVideoList(DeviceSession deviceSession, ByteBuf buf) {
