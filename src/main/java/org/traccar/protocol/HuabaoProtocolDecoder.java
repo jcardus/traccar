@@ -1039,6 +1039,10 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                 case 0x01:
                     position.set(Position.KEY_ODOMETER, buf.readUnsignedInt() * 100);
                     break;
+                case 0x03:
+                    // speed from the vehicle's recorder, 0.1 km/h (0 on a camera with no wired speed source)
+                    position.set(Position.KEY_OBD_SPEED, buf.readUnsignedShort() * 0.1);
+                    break;
                 case 0x02:
                     int fuel = buf.readUnsignedShort();
                     if (BitUtil.check(fuel, 15)) {
