@@ -170,17 +170,51 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
             if (BitUtil.check(value, 28)) {
                 position.addAlarm(Position.ALARM_MOVEMENT);
             }
-            if (BitUtil.check(value, 29) || BitUtil.check(value, 30)) {
-                if (model == null || !model.equals("VL300")) {
+            if (model == null || !model.equals("VL300")) {
+                // The G40 / G40PRO camera keeps bit 30 set on every report, so it is not an accident there
+                boolean rollover = BitUtil.check(value, 30) && !isG40(model);
+                if (BitUtil.check(value, 29) || rollover) {
                     position.addAlarm(Position.ALARM_ACCIDENT);
                 }
             }
         }
     }
 
+    static boolean isG40(String model) {
+        return "G40".equals(model) || "G40PRO".equals(model);
+    }
+
     private int readSignedWord(ByteBuf buf) {
         int value = buf.readUnsignedShort();
         return BitUtil.check(value, 15) ? -BitUtil.to(value, 15) : BitUtil.to(value, 15);
+    }
+
+    // JT/T 1078 / Jimi-style 0xE8 blocks with id >= 0x1000: WORD id + BYTE length.
+    // Status block 0x2005 carries networkType (0 none, 1 Wi-Fi, 2 2G, 3 3G, 4 4G) for camera sync.
+    private void decodeNetworkStatusExtension(Position position, ByteBuf buf, int endIndex) {
+        while (endIndex - buf.readerIndex() >= 3) {
+            int id = buf.readUnsignedShort();
+            int blockLength = buf.readUnsignedByte();
+            int blockEnd = buf.readerIndex() + blockLength;
+            if (blockEnd > endIndex) {
+                return;
+            }
+            if (id == 0x2005) {
+                while (blockEnd - buf.readerIndex() >= 3) {
+                    int statusId = buf.readUnsignedShort();
+                    int statusLength = buf.readUnsignedByte();
+                    int statusEnd = buf.readerIndex() + statusLength;
+                    if (statusEnd > blockEnd) {
+                        return;
+                    }
+                    if (statusId == 0x0006 && statusLength == 1) {
+                        position.set("networkType", buf.readUnsignedByte());
+                    }
+                    buf.readerIndex(statusEnd);
+                }
+            }
+            buf.readerIndex(blockEnd);
+        }
     }
 
     private Date readDate(ByteBuf buf, TimeZone timeZone) {
@@ -723,6 +757,15 @@ public class HuabaoProtocolDecoder extends BaseProtocolDecoder {
                         buf.skipBytes(6); // mac
                         position.set(Position.PREFIX_TEMP + sensorIndex, decodeCustomDouble(buf));
                         position.set("humidity" + sensorIndex, decodeCustomDouble(buf));
+                    }
+                    break;
+                case 0xE8:
+                    // Short payload is a lock status; longer ones carry Jimi/camera status blocks
+                    // (0x2005 → networkType) used by the recording sync Wi-Fi gate.
+                    if (length == 3) {
+                        position.set("lockStatus", buf.readUnsignedMedium());
+                    } else {
+                        decodeNetworkStatusExtension(position, buf, endIndex);
                     }
                     break;
                 case 0xEA:
